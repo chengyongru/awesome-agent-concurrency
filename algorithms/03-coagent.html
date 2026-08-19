@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互演示 CoAgent 与 MTPO：基于读写 footprint 的通知、逆操作与局部修复。">
+  <title>CoAgent / MTPO · Awesome Agent Concurrency</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/site.css">
+  <style>
+    .algorithm-hero h1 { max-inline-size: 12ch; font-size: clamp(2.8rem, 8vw, 6rem); }
+    .order-line { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-block-end: var(--space-4); color: var(--faint); font-family: var(--mono); }
+    .order-chip { display: grid; inline-size: 3.2rem; aspect-ratio: 1; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-soft); transition-property: border-color, color, box-shadow; transition-duration: 300ms; }
+    .order-chip[data-state="ordered"] { border-color: var(--yellow); color: var(--yellow); box-shadow: 0 0 1rem oklch(0.885 0.15 94 / 0.16); }
+    .trajectory-grid { display: grid; gap: 0.55rem; }
+    .trajectory { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr) 6.6rem; align-items: center; gap: 0.7rem; min-block-size: 4.25rem; padding: 0.65rem; border-radius: var(--radius-sm); background: oklch(0.1 0.02 264 / 0.64); box-shadow: inset 0 0 0 1px var(--line); }
+    .trajectory-name { font-family: var(--mono); font-size: 0.7rem; }
+    .ops { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .op { position: relative; padding: 0.38rem 0.55rem; border-radius: 0.3rem; background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.62rem; box-shadow: inset 0 0 0 1px var(--line-strong); transition-property: color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
+    .op[data-state="read"] { color: var(--blue); }
+    .op[data-state="write"] { color: var(--yellow); }
+    .op[data-state="polluted"] { color: var(--red); background: oklch(0.2 0.06 25); text-decoration: line-through; transform: translateY(0.2rem); }
+    .op[data-state="repaired"] { color: var(--green); background: oklch(0.19 0.05 148); }
+    .notification { min-block-size: 1.8rem; display: grid; place-items: center; border-radius: 99rem; color: var(--faint); font-family: var(--mono); font-size: 0.58rem; box-shadow: inset 0 0 0 1px var(--line); }
+    .notification[data-state="active"] { color: var(--red); background: oklch(0.2 0.06 25); box-shadow: inset 0 0 0 1px var(--red), 0 0 1rem oklch(0.68 0.205 25 / 0.18); }
+    .resource-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; margin-block-start: var(--space-4); }
+    .resource { padding: 0.7rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.65rem; box-shadow: inset 0 0 0 1px var(--line); transition-property: color, background-color, box-shadow; transition-duration: 300ms; }
+    .resource strong { display: block; margin-block-end: 0.25rem; color: var(--chalk); }
+    .resource[data-state="changed"] { color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); box-shadow: inset 0 0 0 1px var(--yellow); }
+    @media (max-width: 35rem) { .trajectory { grid-template-columns: 3rem minmax(0, 1fr); } .notification { grid-column: 2; justify-self: start; padding-inline: 0.6rem; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="02-ticket-sequencer.html">Sequencer</a><a href="04-latte.html">下一页：LATTE</a></nav></header>
+  <main id="main">
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">03 · Semantic concurrency control</span><h1 class="spacer-top">CoAgent / <span class="accent-yellow">MTPO</span></h1><p>固定 serialization order，但允许 Agent 投机执行。发生冲突时，runtime 只通知真正读过被修改对象的人，Agent 只修复依赖该前提的操作。</p></div></section>
+    <section class="section page-shell" aria-labelledby="demo-title">
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">对象 X 变了，不等于整个世界失效</h2><p>下面的 B 读取了 `parser.py`，C 没有。当 A 的写入到达时，只有 B 的一段 trajectory 被污染。</p></div>
+      <div class="split">
+        <div class="stage" data-demo="coagent">
+          <div class="stage-topbar"><span class="stage-label">MTPO / monotonic trajectory</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待 launch</span></span></div>
+          <div class="stage-canvas">
+            <div class="order-line" aria-label="序列化顺序"><span class="order-chip" data-order="0">A</span><span>≺</span><span class="order-chip" data-order="1">B</span><span>≺</span><span class="order-chip" data-order="2">C</span></div>
+            <div class="trajectory-grid">
+              <div class="trajectory" data-lane="0"><span class="trajectory-name">A · low</span><div class="ops"><span class="op" data-op="a-read">read task:17</span><span class="op" data-op="a-write">write parser.py</span></div><span class="notification" data-note="0">quiet</span></div>
+              <div class="trajectory" data-lane="1"><span class="trajectory-name">B · mid</span><div class="ops"><span class="op" data-op="b-read">read parser.py</span><span class="op" data-op="b-plan">edit tests</span></div><span class="notification" data-note="1">quiet</span></div>
+              <div class="trajectory" data-lane="2"><span class="trajectory-name">C · high</span><div class="ops"><span class="op" data-op="c-read">read task:17</span><span class="op" data-op="c-plan">write docs</span></div><span class="notification" data-note="2">quiet</span></div>
+            </div>
+            <div class="resource-grid" aria-label="共享资源">
+              <div class="resource" data-resource="task"><strong>task:17</strong><span>stable</span></div>
+              <div class="resource" data-resource="parser"><strong>repo:/parser.py</strong><span data-parser-version>version α</span></div>
+              <div class="resource" data-resource="docs"><strong>repo:/docs</strong><span>independent</span></div>
+            </div>
+            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">order</span><span class="phase">footprint</span><span class="phase">speculate</span><span class="phase">notify</span><span class="phase">repair</span></div>
+          </div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <p class="sr-only" role="status" aria-live="polite" data-live></p>
+        </div>
+        <aside class="narrative" aria-label="CoAgent 解释">
+          <div class="metric-grid"><div class="metric"><span class="metric-label">Reported speedup</span><div class="metric-value">1.4×</div><p class="metric-note">十个竞争工作负载</p></div><div class="metric"><span class="metric-label">Repair scope</span><div class="metric-value">⊂</div><p class="metric-note">局部依赖链</p></div></div>
+          <div class="formula"><span class="accent-blue">reads</span> ∩ <span class="accent-yellow">writes</span> ≠ ∅ → notify</div>
+          <div class="callout"><strong>核心变化</strong><p>从 global OCC 进入 resource-scoped、dependency-aware concurrency control。</p></div>
+          <div class="callout" style="border-color: var(--yellow);"><strong>强前提</strong><p>共享状态必须经过注册工具；footprint 和 inverse 必须正确。</p></div>
+          <a class="source-link" href="https://arxiv.org/abs/2606.15376">阅读 CoAgent 论文 ↗</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer page-shell"><span>上一页：<a href="02-ticket-sequencer.html">← Sequencer</a></span><span>下一页：<a href="04-latte.html">LATTE →</a></span></footer>
+  <script type="module" src="../assets/demos/coagent.js"></script>
+</body>
+</html>

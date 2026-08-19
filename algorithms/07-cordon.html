@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互演示 Cordon semantic transaction：lineage、authority、用户意图与外部 effect 的提交验证。">
+  <title>Cordon · Awesome Agent Concurrency</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/site.css">
+  <style>
+    .algorithm-hero h1 { max-inline-size: 10ch; }
+    .lineage { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; align-items: stretch; margin-block: var(--space-3) var(--space-4); }
+    .lineage-node { position: relative; display: grid; min-block-size: 8rem; align-content: center; gap: 0.4rem; padding: 0.75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--ink-soft); color: var(--faint); text-align: center; transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 320ms; }
+    .lineage-node:not(:last-child)::after { content: "→"; position: absolute; inset-block-start: 50%; inset-inline-end: -0.75rem; z-index: 3; color: var(--faint); font-family: var(--mono); transform: translateY(-50%); }
+    .lineage-node span { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lineage-node strong { color: var(--chalk); font-size: 0.78rem; line-height: 1.35; }
+    .lineage-node[data-state="active"] { border-color: var(--yellow); color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); transform: translateY(-0.25rem); }
+    .lineage-node[data-state="valid"] { border-color: var(--green); color: var(--green); background: oklch(0.19 0.05 148 / 0.26); }
+    .lineage-node[data-state="invalid"] { border-color: var(--red); color: var(--red); background: oklch(0.2 0.06 25 / 0.32); text-decoration: line-through; }
+    .validation-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; }
+    .validation { display: grid; min-block-size: 5.4rem; place-content: center; gap: 0.25rem; padding: 0.65rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.65); color: var(--faint); font-family: var(--mono); font-size: 0.62rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
+    .validation strong { color: var(--chalk); }
+    .validation[data-state="checking"] { color: var(--yellow); box-shadow: inset 0 0 0 1px var(--yellow); }
+    .validation[data-state="valid"] { color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+    .validation[data-state="invalid"] { color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+    .settlement-banner { display: grid; min-block-size: 3.6rem; place-items: center; margin-block-start: var(--space-3); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.7rem; box-shadow: inset 0 0 0 1px var(--line); }
+    .settlement-banner[data-state="commit"] { color: var(--green); background: oklch(0.19 0.05 148 / 0.28); box-shadow: inset 0 0 0 1px var(--green); }
+    .settlement-banner[data-state="abort"] { color: var(--red); background: oklch(0.2 0.06 25 / 0.32); box-shadow: inset 0 0 0 1px var(--red); }
+    @media (max-width: 42rem) { .lineage { grid-template-columns: 1fr 1fr; } .lineage-node:nth-child(2)::after { content: "↓"; inset-block-start: auto; inset-block-end: -0.9rem; inset-inline-end: 50%; transform: translateX(50%); } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="06-atomix.html">Atomix</a><a href="08-tracefix.html">下一页：TraceFix</a></nav></header>
+  <main id="main">
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">07 · Semantic transactions</span><h1 class="spacer-top"><span class="accent-yellow">Cordon</span></h1><p>不只追踪调用了什么，还追踪“为什么允许这样做”。观察、总结、决策与外部 effect 形成 lineage，Validate 阶段重新核对权限、意图与当前事实。</p></div></section>
+    <section class="section page-shell" aria-labelledby="demo-title">
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">授权必须绑定这一次动作</h2><p>播放正常事务，或先让观察过期。相同的 deploy 动作，会因为 lineage 失效而从 commit 路径转向 abort。</p></div>
+      <div class="split">
+        <div class="stage" data-demo="cordon">
+          <div class="stage-topbar"><span class="stage-label">Semantic transaction / tx-17</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>transaction idle</span></span></div>
+          <div class="stage-canvas">
+            <div class="lineage" aria-label="决策 lineage">
+              <div class="lineage-node" data-lineage="0"><span>Observation</span><strong>health = degraded</strong></div>
+              <div class="lineage-node" data-lineage="1"><span>Summary</span><strong>capacity is low</strong></div>
+              <div class="lineage-node" data-lineage="2"><span>Decision</span><strong>scale API to 6</strong></div>
+              <div class="lineage-node" data-lineage="3"><span>External effect</span><strong>deploy + notify</strong></div>
+            </div>
+            <div class="validation-grid" aria-label="语义验证条件">
+              <div class="validation" data-check="lineage"><strong>LINEAGE</strong><span>facts still support action</span></div>
+              <div class="validation" data-check="authority"><strong>AUTHORITY</strong><span>tx-17 · scale · API</span></div>
+              <div class="validation" data-check="intent"><strong>INTENT</strong><span>approval expires 14:30</span></div>
+            </div>
+            <div class="settlement-banner" data-settlement>effects remain staged</div>
+            <div class="phase-rail" style="--phase-count: 4;"><span class="phase">prepare</span><span class="phase">derive</span><span class="phase">validate</span><span class="phase">commit / abort</span></div>
+          </div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="stale-mode" aria-pressed="false">使观察过期</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <p class="sr-only" role="status" aria-live="polite" data-live></p>
+        </div>
+        <aside class="narrative" aria-label="Cordon 解释">
+          <div class="metric-grid"><div class="metric"><span class="metric-label">Transaction</span><div class="metric-value">why</div><p class="metric-note">不只是 what</p></div><div class="metric"><span class="metric-label">Approval</span><div class="metric-value">tx</div><p class="metric-note">动作、目标、时间窗</p></div></div>
+          <div class="formula">observe → derive → <span class="accent-yellow">authorize</span> → effect</div>
+          <div class="callout"><strong>三阶段协议</strong><p>Prepare 暂存，Validate 检查语义与权限，最后 Commit 或 Abort。</p></div>
+          <div class="callout" style="border-color: var(--yellow);"><strong>研究性质</strong><p>Cordon 更像一套语义与权限模型，而不是已经大规模验证的生产实现。</p></div>
+          <a class="source-link" href="https://arxiv.org/abs/2606.17573">阅读 Cordon 论文 ↗</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer page-shell"><span>上一页：<a href="06-atomix.html">← Atomix</a></span><span>下一页：<a href="08-tracefix.html">TraceFix →</a></span></footer>
+  <script type="module" src="../assets/demos/cordon.js"></script>
+</body>
+</html>

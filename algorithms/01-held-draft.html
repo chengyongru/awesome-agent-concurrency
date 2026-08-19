@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互演示 Held Draft 的房间版本检查与高竞争 O(n²) 退化。">
+  <title>Held Draft · Awesome Agent Concurrency</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/site.css">
+  <style>
+    .algorithm-hero { padding-block-end: var(--space-5); }
+    .algorithm-hero h1 { max-inline-size: 12ch; font-size: clamp(2.8rem, 8vw, 6rem); }
+    .room-state { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; margin-block-end: var(--space-4); }
+    .version-orbit { position: relative; display: grid; inline-size: 5.4rem; aspect-ratio: 1; place-items: center; border: 1px solid var(--blue); border-radius: 50%; color: var(--blue); font-family: var(--mono); box-shadow: 0 0 2rem oklch(0.75 0.145 242 / 0.15); }
+    .version-orbit::after { content: "room"; position: absolute; inset-block-end: -0.8rem; padding-inline: 0.35rem; background: var(--ink-raised); color: var(--faint); font-size: 0.58rem; text-transform: uppercase; }
+    .room-copy strong { display: block; font-family: var(--display); font-size: 1.45rem; }
+    .room-copy small { color: var(--muted); font-family: var(--mono); }
+    .held-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: var(--space-3); }
+    .held-summary div { padding: 0.65rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.68); text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
+    .held-summary strong { display: block; color: var(--yellow); font-family: var(--display); font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+    .held-summary span { color: var(--faint); font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header page-shell">
+    <a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a>
+    <nav class="site-nav" aria-label="算法导航"><a href="../index.html#atlas">全部机制</a><a href="02-ticket-sequencer.html">下一页：Sequencer</a></nav>
+  </header>
+  <main id="main">
+    <section class="hero algorithm-hero page-shell">
+      <div class="hero-copy">
+        <span class="eyebrow">01 · Global optimistic concurrency</span>
+        <h1 class="spacer-top">Held <span class="accent-red">Draft</span></h1>
+        <p>一个优秀的 stale-action 安全阀，也是一种会在高竞争下形成三角形成本的调度方法。让所有 Agent 同时读 v₀，然后亲手制造冲突。</p>
+      </div>
+    </section>
+
+    <section class="section page-shell" aria-labelledby="demo-title">
+      <div class="section-heading">
+        <span class="eyebrow">Live protocol</span>
+        <h2 id="demo-title">房间变了，所以全部重判</h2>
+        <p>每个 draft 都绑定生成时看到的 room version。提交时版本不同，就被 hold，并交还给 Agent 决定。</p>
+      </div>
+      <div class="split">
+        <div class="stage" data-demo="held-draft">
+          <div class="stage-topbar"><span class="stage-label">Room / count-to-n</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待开始</span></span></div>
+          <div class="stage-canvas">
+            <div class="room-state">
+              <div class="room-copy"><strong data-headline>所有 Agent 读取同一快照</strong><small data-subline>base_room_version = v₀</small></div>
+              <div class="version-orbit"><span data-room-version>v₀</span></div>
+            </div>
+            <div class="agent-row" data-agents aria-label="Agent 状态"></div>
+            <div class="message-lane" data-messages aria-label="Draft 提交状态"></div>
+            <div class="held-summary" aria-label="运行指标">
+              <div><strong data-round>0</strong><span>round</span></div>
+              <div><strong data-held>0</strong><span>held</span></div>
+              <div><strong data-decisions>0</strong><span>decisions</span></div>
+            </div>
+            <div class="phase-rail" style="--phase-count: 4;">
+              <span class="phase">read v₀</span><span class="phase">draft</span><span class="phase">validate</span><span class="phase">retry</span>
+            </div>
+          </div>
+          <div class="stage-controls">
+            <div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div>
+            <label class="range-wrap">Agent 数量：<output data-agent-output>4</output><input type="range" min="3" max="8" value="4" data-agent-range></label>
+            <div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div>
+          </div>
+          <p class="sr-only" role="status" aria-live="polite" data-live></p>
+        </div>
+
+        <aside class="narrative" aria-label="Held Draft 解释">
+          <div class="metric-grid">
+            <div class="metric"><span class="metric-label">Worst case</span><div class="metric-value">O(n²)</div><p class="metric-note">高竞争退化</p></div>
+            <div class="metric"><span class="metric-label">Protects</span><div class="metric-value">msg</div><p class="metric-note">消息提交边界</p></div>
+          </div>
+          <div class="formula"><span class="accent-yellow">n + (n−1) + … + 1</span> = n(n+1)/2</div>
+          <div class="callout"><strong>它解决什么</strong><p>基于旧世界生成的消息，不应盲目进入新世界。</p></div>
+          <div class="callout" style="border-color: var(--red);"><strong>它没有解决什么</strong><p>ownership、细粒度依赖，以及消息之外已经发生的工具副作用。</p></div>
+          <a class="source-link" href="https://raft.build/resources/blog/is-having-agents-in-the-room-meant-to-be-chaotic/">阅读 Raft 的 Held Draft 说明 ↗</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer page-shell"><span>上一页：<a href="../index.html">总览</a></span><span>下一页：<a href="02-ticket-sequencer.html">Ticket / Sequencer →</a></span></footer>
+  <script type="module" src="../assets/demos/held-draft.js"></script>
+</body>
+</html>

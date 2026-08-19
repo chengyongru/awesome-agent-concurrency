@@ -1,0 +1,11 @@
+{
+  "name": "awesome-agent-concurrency",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive, Manim-inspired visual explanations of modern multi-agent coordination protocols.",
+  "scripts": {
+    "start": "python -m http.server 4173",
+    "test": "node tests/validate.mjs"
+  },
+  "license": "MIT"
+}

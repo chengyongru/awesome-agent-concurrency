@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互演示 SyncPlan 的长周期 action chain、显式同步点、barrier 与死锁检测。">
+  <title>SyncPlan · Awesome Agent Concurrency</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/site.css">
+  <style>
+    .algorithm-hero h1 { max-inline-size: 10ch; }
+    .timeline-board { display: grid; gap: 0.7rem; margin-block-start: var(--space-2); }
+    .timeline-header, .timeline-lane { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 0.7rem; align-items: center; }
+    .timeline-header { color: var(--faint); font-family: var(--mono); font-size: 0.58rem; }
+    .ticks { display: grid; grid-template-columns: repeat(6, 1fr); }
+    .ticks span { border-inline-start: 1px solid var(--line); padding-inline-start: 0.3rem; }
+    .lane-name { color: var(--muted); font-family: var(--mono); font-size: 0.68rem; }
+    .lane-track { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.28rem; min-block-size: 4.2rem; padding: 0.35rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.62); box-shadow: inset 0 0 0 1px var(--line); }
+    .action-block { display: grid; min-inline-size: 0; place-items: center; padding: 0.35rem; border-radius: 0.3rem; background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.58rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); transition-property: color, background-color, opacity, transform, box-shadow; transition-duration: 300ms; }
+    .action-block[data-state="active"] { color: var(--yellow); background: oklch(0.2 0.05 94 / 0.3); transform: translateY(-0.15rem); }
+    .action-block[data-state="done"] { color: var(--green); background: oklch(0.19 0.05 148 / 0.28); }
+    .action-block[data-state="wait"] { color: var(--blue); background: oklch(0.18 0.05 242 / 0.28); }
+    .action-block[data-state="stale"] { color: var(--red); background: oklch(0.2 0.06 25 / 0.35); text-decoration: line-through; }
+    .action-block[data-state="deadlock"] { color: var(--red); background: oklch(0.2 0.06 25); box-shadow: inset 0 0 0 1px var(--red), 0 0 1rem oklch(0.68 0.205 25 / 0.18); }
+    .runtime-primitives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: var(--space-4); }
+    .primitive { display: grid; min-block-size: 4.2rem; place-content: center; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
+    .primitive strong { color: var(--chalk); }
+    .primitive[data-state="active"] { color: var(--violet); box-shadow: inset 0 0 0 1px var(--violet); }
+    @media (max-width: 38rem) { .action-block { writing-mode: vertical-rl; font-size: 0.54rem; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="04-latte.html">LATTE</a><a href="06-atomix.html">下一页：Atomix</a></nav></header>
+  <main id="main">
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">05 · Explicit synchronization</span><h1 class="spacer-top"><span class="accent-violet" style="color:var(--violet);">Sync</span>Plan</h1><p>先生成长周期 action chain，再把 wait、barrier、milestone 和 deadlock 变成 runtime 可执行的同步原语；只在计划假设真正失效时重请 coordinator。</p></div></section>
+    <section class="section page-shell" aria-labelledby="demo-title">
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">提前画出同步点，停止持续聊天</h2><p>播放正常路径，或点击“制造死锁”查看 runtime 如何在 A、B 相互等待时阻止无休止轮询。</p></div>
+      <div class="split">
+        <div class="stage" data-demo="syncplan">
+          <div class="stage-topbar"><span class="stage-label">Action chains / t₀ → t₅</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待编译计划</span></span></div>
+          <div class="stage-canvas">
+            <div class="timeline-board" aria-label="Agent 长周期计划时间线">
+              <div class="timeline-header"><span></span><div class="ticks"><span>t₀</span><span>t₁</span><span>t₂</span><span>t₃</span><span>t₄</span><span>t₅</span></div></div>
+              <div class="timeline-lane" data-lane="A"><span class="lane-name">A</span><div class="lane-track"><span class="action-block" data-action-block="A0">prep</span><span class="action-block" data-action-block="A1">build</span><span class="action-block" data-action-block="A2">milestone₁</span><span class="action-block" data-action-block="A3">wait B</span><span class="action-block" data-action-block="A4">merge</span><span class="action-block" data-action-block="A5">done</span></div></div>
+              <div class="timeline-lane" data-lane="B"><span class="lane-name">B</span><div class="lane-track"><span class="action-block" data-action-block="B0">prep</span><span class="action-block" data-action-block="B1">wait A</span><span class="action-block" data-action-block="B2">consume₁</span><span class="action-block" data-action-block="B3">barrier</span><span class="action-block" data-action-block="B4">verify</span><span class="action-block" data-action-block="B5">done</span></div></div>
+              <div class="timeline-lane" data-lane="C"><span class="lane-name">C</span><div class="lane-track"><span class="action-block" data-action-block="C0">scan</span><span class="action-block" data-action-block="C1">model</span><span class="action-block" data-action-block="C2">model</span><span class="action-block" data-action-block="C3">barrier</span><span class="action-block" data-action-block="C4">adapt</span><span class="action-block" data-action-block="C5">done</span></div></div>
+            </div>
+            <div class="runtime-primitives" aria-label="Runtime 同步原语"><span class="primitive" data-primitive="gate"><strong>GATE</strong>milestone₁</span><span class="primitive" data-primitive="barrier"><strong>BARRIER</strong>B + C</span><span class="primitive" data-primitive="stale"><strong>STALE?</strong>remaining plan</span></div>
+            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">compile</span><span class="phase">run</span><span class="phase">gate</span><span class="phase">barrier</span><span class="phase">correct</span></div>
+          </div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="deadlock" aria-pressed="false">制造死锁</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <p class="sr-only" role="status" aria-live="polite" data-live></p>
+        </div>
+        <aside class="narrative" aria-label="SyncPlan 解释">
+          <div class="metric-grid"><div class="metric"><span class="metric-label">Coordination</span><div class="metric-value">once</div><p class="metric-note">先生成 action chain</p></div><div class="metric"><span class="metric-label">Replan</span><div class="metric-value">on</div><p class="metric-note">仅在假设失效时</p></div></div>
+          <div class="formula"><span class="accent-blue">wait</span> · <span style="color:var(--violet);">barrier</span> · <span class="accent-red">deadlock</span> → runtime</div>
+          <div class="callout"><strong>不要用自然语言轮询同步</strong><p>“你做完了吗？”不应成为每一步的 LLM 调用。</p></div>
+          <div class="callout" style="border-color: var(--violet);"><strong>适用边界</strong><p>论文结果来自中心化游戏环境，不能直接外推到任意 coding 或生产工具。</p></div>
+          <a class="source-link" href="https://arxiv.org/abs/2608.01652">阅读 SyncPlan 论文 ↗</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer page-shell"><span>上一页：<a href="04-latte.html">← LATTE</a></span><span>下一页：<a href="06-atomix.html">Atomix →</a></span></footer>
+  <script type="module" src="../assets/demos/syncplan.js"></script>
+</body>
+</html>
