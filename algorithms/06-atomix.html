@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 Atomix 的事务化工具使用、effect class、资源 frontier 与 settlement。">
+  <meta name="description" content="交互演示多个 Agent 共同预订差旅时，如何暂存、补偿和延迟释放不同类型的外部副作用。">
   <title>Atomix · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
@@ -12,11 +12,11 @@
     .transaction-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; gap: 0.4rem; margin-block-end: var(--space-4); }
     .tx-node { position: relative; display: grid; min-block-size: 4.2rem; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; transition-property: color, background-color, border-color, transform, box-shadow; transition-duration: 300ms; }
     .tx-node:not(:last-child)::after { content: "→"; position: absolute; inset-inline-end: -0.55rem; z-index: 2; color: var(--faint); }
-    .tx-node[data-state="active"] { border-color: var(--yellow); color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); transform: translateY(-0.2rem); box-shadow: 0 0 1rem oklch(0.885 0.15 94 / 0.14); }
+    .tx-node[data-state="active"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-0.2rem); box-shadow: 0 0 1rem color-mix(in oklch, var(--accent) 12%, transparent); }
     .tx-node[data-state="done"] { border-color: var(--green); color: var(--green); }
-    .tx-node[data-state="abort"] { border-color: var(--red); color: var(--red); background: oklch(0.2 0.06 25 / 0.35); }
+    .tx-node[data-state="abort"] { border-color: var(--red); color: var(--red); background: var(--red-soft); }
     .effect-stack { display: grid; gap: 0.55rem; }
-    .effect { display: grid; grid-template-columns: 5.7rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-block-size: 4rem; padding: 0.65rem 0.75rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.64); box-shadow: inset 0 0 0 1px var(--line); }
+    .effect { display: grid; grid-template-columns: 5.7rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-block-size: 4rem; padding: 0.65rem 0.75rem; border-radius: var(--radius-sm); background: var(--ink-raised); box-shadow: inset 0 0 0 1px var(--line); }
     .effect-class { color: var(--effect-color); font-family: var(--mono); font-size: 0.62rem; }
     .effect strong { display: block; font-size: 0.78rem; }
     .effect small { color: var(--faint); font-family: var(--mono); }
@@ -35,31 +35,28 @@
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="05-syncplan.html">SyncPlan</a><a href="07-cordon.html">下一页：Cordon</a></nav></header>
   <main id="main">
-    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">06 · Transactional tool effects</span><h1 class="spacer-top"><span class="accent-green">Atomix</span></h1><p>Tool return 不再代表操作已经永久生效。每个 effect 带着资源范围、幂等键和类别进入 transaction，等相关 resource frontier 安全后才结算。</p></div></section>
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">06 · Effect settlement</span><h1 class="spacer-top"><span class="accent-green">Atomix</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">工具执行，与最终生效，是两件事</h2><p>正常路径会 release 所有效果；切换到 abort 路径，观察 buffer 被丢弃、预订被补偿，而邮件从未离开 gate。</p></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">差旅预订的副作用结算</h2></div>
       <div class="split">
         <div class="stage" data-demo="atomix">
-          <div class="stage-topbar"><span class="stage-label">Transaction / epoch 4</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>transaction closed</span></span></div>
           <div class="stage-canvas">
-            <div class="transaction-flow" aria-label="Atomix 事务阶段"><span class="tx-node" data-tx="0">open</span><span class="tx-node" data-tx="1">execute</span><span class="tx-node" data-tx="2">seal</span><span class="tx-node" data-tx="3">frontier</span><span class="tx-node" data-tx="4">settle</span></div>
+            <div class="transaction-flow" aria-label="差旅事务阶段"><span class="tx-node" data-tx="0">开启事务</span><span class="tx-node" data-tx="1">执行工具</span><span class="tx-node" data-tx="2">冻结范围</span><span class="tx-node" data-tx="3">等待确认</span><span class="tx-node" data-tx="4">结算</span></div>
             <div class="effect-stack" aria-label="工具副作用">
-              <div class="effect" data-effect="patch" style="--effect-color: var(--blue);"><span class="effect-class">BUFFERABLE</span><div><strong>stage patch</strong><small>repo:/src/parser.py</small></div><span class="effect-state">not run</span></div>
-              <div class="effect" data-effect="booking" style="--effect-color: var(--violet);"><span class="effect-class">REVERSIBLE</span><div><strong>reserve hotel</strong><small>inverse: cancel_reservation</small></div><span class="effect-state">not run</span></div>
-              <div class="effect" data-effect="payment" style="--effect-color: var(--yellow);"><span class="effect-class">IDEMPOTENT</span><div><strong>create payment intent</strong><small>key: tx4-payment</small></div><span class="effect-state">not run</span></div>
-              <div class="effect" data-effect="email" style="--effect-color: var(--red);"><span class="effect-class">IRREVERSIBLE</span><div><strong>send confirmation email</strong><small>release only after commit</small></div><span class="effect-state">gated</span></div>
+              <div class="effect" data-effect="patch" style="--effect-color: var(--blue);"><span class="effect-class">可暂存</span><div><strong>Ada · 生成行程草稿</strong><small>只保存在事务工作区</small></div><span class="effect-state">未执行</span></div>
+              <div class="effect" data-effect="booking" style="--effect-color: var(--violet);"><span class="effect-class">可补偿</span><div><strong>Lin · 预留酒店</strong><small>补偿操作：取消预留</small></div><span class="effect-state">未执行</span></div>
+              <div class="effect" data-effect="payment" style="--effect-color: var(--yellow);"><span class="effect-class">可补偿</span><div><strong>Mira · 创建支付意图</strong><small>取消意图 · 幂等键 trip-42-payment</small></div><span class="effect-state">未执行</span></div>
+              <div class="effect" data-effect="email" style="--effect-color: var(--red);"><span class="effect-class">不可逆</span><div><strong>Sora · 发送确认邮件</strong><small>仅在事务提交后执行</small></div><span class="effect-state">等待提交</span></div>
             </div>
-            <div class="frontier"><span>resource frontier</span><div class="frontier-track"><i class="frontier-fill" data-frontier></i></div><strong data-frontier-label>epoch 1 / 4</strong></div>
-            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">open</span><span class="phase">effects</span><span class="phase">seal</span><span class="phase">wait</span><span class="phase">settle</span></div>
+            <div class="frontier"><span>冲突前序已结算</span><div class="frontier-track"><i class="frontier-fill" data-frontier></i></div><strong data-frontier-label>0 / 2</strong></div>
           </div>
-          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="abort-mode" aria-pressed="false">模拟 abort</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 06</span></div></div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="abort-mode" aria-pressed="false">模拟预算拒绝</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="Atomix 解释">
-          <div class="metric-grid"><div class="metric"><span class="metric-label">Boundary</span><div class="metric-value">effect</div><p class="metric-note">不只保护消息</p></div><div class="metric"><span class="metric-label">Irreversible</span><div class="metric-value">gate</div><p class="metric-note">commit 前不释放</p></div></div>
-          <div class="formula">open → seal → <span class="accent-yellow">frontier</span> → settle</div>
-          <div class="callout"><strong>Compensation ≠ rollback</strong><p>取消预订可能收费；外部世界已经观察到的事实不能真正撤销。</p></div>
-          <div class="callout" style="border-color: var(--red);"><strong>系统边界</strong><p>跨多个异构外部系统，仍可能出现 partial commit；原型也不等于 crash-safe exactly-once。</p></div>
+          <div class="formula">stage → confirm → <span class="accent-yellow">commit / abort</span></div>
+          <div class="callout"><strong>补偿限制</strong><p>取消酒店预留不等于从未预订；外部系统可能已经记录该操作。</p></div>
+          <div class="callout" style="border-color: var(--red);"><strong>系统边界</strong><p>跨多个异构外部系统时仍可能出现 partial commit；当前原型不提供 crash-safe exactly-once 保证。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2602.14849">阅读 Atomix 论文 ↗</a>
         </aside>
       </div>

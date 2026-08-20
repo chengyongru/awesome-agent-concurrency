@@ -4,19 +4,21 @@ const root = qs('[data-demo="cordon"]');
 const staleButton = qs('[data-action="stale-mode"]', root);
 let staleMode = false;
 const steps = [
-  { label: 'Prepare 捕获当前观察，并打开 tx-17。', phase: 0, mode: 'observe', status: 'observation captured' },
-  { label: 'Agent 从观察中形成可追溯总结。', phase: 1, mode: 'summary', status: 'summary derived' },
-  { label: '总结支持一个具体、可审计的 scale 决策。', phase: 1, mode: 'decision', status: 'decision linked' },
-  { label: '部署与通知 effect 被暂存，还没有外部释放。', phase: 1, mode: 'effect', status: 'effects staged' },
-  { label: 'Validate 同时检查 lineage、authority 与当前用户意图。', phase: 2, mode: 'validate', status: 'semantic validation' },
-  { label: 'Runtime 计算验证结果。', phase: 2, mode: 'verdict', status: 'validation verdict' },
-  { label: '事务进入最终结算。', phase: 3, mode: 'settle', status: 'transaction settled' },
+  { label: 'Ada 记录 payment-api 的当前队列与 CPU。', phase: 0, mode: 'observe', status: '监控事实已记录' },
+  { label: 'Lin 根据同一观察判断当前容量不足。', phase: 1, mode: 'summary', status: '诊断已关联事实' },
+  { label: 'Mira 提议将 payment-api 从 4 个副本扩到 6 个。', phase: 1, mode: 'decision', status: '扩容提议已生成' },
+  { label: 'Omar 的部署操作保持暂存，不立即修改生产环境。', phase: 1, mode: 'effect', status: '外部操作仍被阻挡' },
+  { label: 'Runtime 在提交前同时检查事实、动作权限和批准时间窗。', phase: 2, mode: 'validate', status: '提交条件检查中' },
+  { label: 'Runtime 根据最新状态计算是否仍可执行扩容。', phase: 2, mode: 'verdict', status: '提交条件已判定' },
+  { label: '只有三个条件均有效时，Omar 才能执行部署与通知。', phase: 3, mode: 'settle', status: '扩容事务已结算' },
 ];
 
 function clear() {
   qsa('[data-lineage]', root).forEach((node) => { node.dataset.state = ''; });
   qsa('[data-check]', root).forEach((node) => { node.dataset.state = ''; });
-  qs('[data-settlement]', root).dataset.state = ''; setText('[data-settlement]', 'effects remain staged', root); setPhases(-1, root);
+  setText('[data-observation]', '队列 1280 · CPU 94%', root);
+  setText('[data-lineage-check]', '队列与 CPU 仍超过阈值', root);
+  qs('[data-settlement]', root).dataset.state = ''; setText('[data-settlement]', '扩容操作尚未执行', root); setPhases(-1, root);
 }
 
 function render(step) {
@@ -34,15 +36,17 @@ function render(step) {
     qsa('[data-check]', root).forEach((node) => { node.dataset.state = 'valid'; });
     if (staleMode) {
       qs('[data-lineage="0"]', root).dataset.state = 'invalid'; qs('[data-lineage="1"]', root).dataset.state = 'invalid'; qs('[data-check="lineage"]', root).dataset.state = 'invalid';
+      setText('[data-observation]', '队列 180 · CPU 42%', root);
+      setText('[data-lineage-check]', '负载已恢复，扩容依据失效', root);
     }
   }
-  if (step.mode === 'effect' || step.mode === 'validate' || step.mode === 'verdict') setText('[data-settlement]', 'deploy + notify staged behind gate', root);
+  if (step.mode === 'effect' || step.mode === 'validate' || step.mode === 'verdict') setText('[data-settlement]', '部署与通知仍在提交门后', root);
   if (step.mode === 'settle') {
     qs('[data-settlement]', root).dataset.state = staleMode ? 'abort' : 'commit';
-    setText('[data-settlement]', staleMode ? 'ABORT · local mutation reverted · effects blocked' : 'COMMIT · effects released with tx-bound authority', root);
-    setText('[data-status]', staleMode ? 'lineage invalid → abort' : 'all checks valid → commit', root);
+    setText('[data-settlement]', staleMode ? '已中止 · 负载恢复 · 未执行扩容' : '已提交 · payment-api 副本数 4 → 6', root);
+    setText('[data-status]', staleMode ? '事实失效，拒绝扩容' : '三个条件有效，允许扩容', root);
   }
 }
 
 const demo = makeStepper({ root, steps, render, onReset: clear, delay: 1100 });
-staleButton.addEventListener('click', () => { staleMode = !staleMode; staleButton.setAttribute('aria-pressed', String(staleMode)); staleButton.textContent = staleMode ? '观察已过期' : '使观察过期'; demo.reset(); });
+staleButton.addEventListener('click', () => { staleMode = !staleMode; staleButton.setAttribute('aria-pressed', String(staleMode)); staleButton.textContent = staleMode ? '恢复高负载' : '模拟负载恢复'; demo.reset(); });

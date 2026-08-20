@@ -15,20 +15,16 @@ export function makeStepper({ root = document, steps, render, delay = 1100, onRe
   const play = qs('[data-action="play"]', root);
   const step = qs('[data-action="step"]', root);
   const reset = qs('[data-action="reset"]', root);
-  const fill = qs('.progress-fill', root);
-  const count = qs('.step-count', root);
   const live = qs('[data-live]', root);
   let index = -1;
   let timer = null;
+  const resolveSteps = () => (typeof steps === 'function' ? steps() : steps);
 
   function announce(current) {
     if (live && current?.label) live.textContent = current.label;
   }
 
   function updateControls() {
-    const shown = Math.max(0, index + 1);
-    if (fill) fill.style.inlineSize = `${(shown / steps.length) * 100}%`;
-    if (count) count.textContent = `${String(shown).padStart(2, '0')} / ${String(steps.length).padStart(2, '0')}`;
     if (play) {
       const isPlaying = timer !== null;
       play.innerHTML = isPlaying ? `${ICONS.pause}<span>暂停</span>` : `${ICONS.play}<span>播放</span>`;
@@ -43,24 +39,26 @@ export function makeStepper({ root = document, steps, render, delay = 1100, onRe
   }
 
   function advance() {
-    if (index >= steps.length - 1) {
+    const currentSteps = resolveSteps();
+    if (index >= currentSteps.length - 1) {
       stop();
       return false;
     }
     index += 1;
-    render(steps[index], index);
-    announce(steps[index]);
+    render(currentSteps[index], index);
+    announce(currentSteps[index]);
     updateControls();
-    if (index >= steps.length - 1) stop();
+    if (index >= currentSteps.length - 1) stop();
     return true;
   }
 
   function toggle() {
+    const currentSteps = resolveSteps();
     if (timer !== null) {
       stop();
       return;
     }
-    if (index >= steps.length - 1) api.reset();
+    if (index >= currentSteps.length - 1) api.reset();
     advance();
     timer = window.setInterval(advance, delay);
     updateControls();

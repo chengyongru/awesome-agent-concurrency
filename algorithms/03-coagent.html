@@ -3,65 +3,119 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 CoAgent 与 MTPO：基于读写 footprint 的通知、逆操作与局部修复。">
+  <meta name="description" content="交互演示多个编码 Agent 并发修改仓库时，如何根据实际读写依赖只修复受影响的工作。">
   <title>CoAgent / MTPO · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 12ch; font-size: clamp(2.8rem, 8vw, 6rem); }
-    .order-line { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-block-end: var(--space-4); color: var(--faint); font-family: var(--mono); }
-    .order-chip { display: grid; inline-size: 3.2rem; aspect-ratio: 1; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-soft); transition-property: border-color, color, box-shadow; transition-duration: 300ms; }
-    .order-chip[data-state="ordered"] { border-color: var(--yellow); color: var(--yellow); box-shadow: 0 0 1rem oklch(0.885 0.15 94 / 0.16); }
-    .trajectory-grid { display: grid; gap: 0.55rem; }
-    .trajectory { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr) 6.6rem; align-items: center; gap: 0.7rem; min-block-size: 4.25rem; padding: 0.65rem; border-radius: var(--radius-sm); background: oklch(0.1 0.02 264 / 0.64); box-shadow: inset 0 0 0 1px var(--line); }
-    .trajectory-name { font-family: var(--mono); font-size: 0.7rem; }
-    .ops { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-    .op { position: relative; padding: 0.38rem 0.55rem; border-radius: 0.3rem; background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.62rem; box-shadow: inset 0 0 0 1px var(--line-strong); transition-property: color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
-    .op[data-state="read"] { color: var(--blue); }
-    .op[data-state="write"] { color: var(--yellow); }
-    .op[data-state="polluted"] { color: var(--red); background: oklch(0.2 0.06 25); text-decoration: line-through; transform: translateY(0.2rem); }
-    .op[data-state="repaired"] { color: var(--green); background: oklch(0.19 0.05 148); }
-    .notification { min-block-size: 1.8rem; display: grid; place-items: center; border-radius: 99rem; color: var(--faint); font-family: var(--mono); font-size: 0.58rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .notification[data-state="active"] { color: var(--red); background: oklch(0.2 0.06 25); box-shadow: inset 0 0 0 1px var(--red), 0 0 1rem oklch(0.68 0.205 25 / 0.18); }
-    .resource-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; margin-block-start: var(--space-4); }
-    .resource { padding: 0.7rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.65rem; box-shadow: inset 0 0 0 1px var(--line); transition-property: color, background-color, box-shadow; transition-duration: 300ms; }
-    .resource strong { display: block; margin-block-end: 0.25rem; color: var(--chalk); }
-    .resource[data-state="changed"] { color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); box-shadow: inset 0 0 0 1px var(--yellow); }
-    @media (max-width: 35rem) { .trajectory { grid-template-columns: 3rem minmax(0, 1fr); } .notification { grid-column: 2; justify-self: start; padding-inline: 0.6rem; } }
+    .coagent-scene { position: relative; min-block-size: 27.5rem; overflow: visible; font-family: var(--mono); }
+    .coagent-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .coagent-paths > path { fill: none; stroke: var(--line-strong); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke-dashoffset 480ms ease-out, stroke 180ms ease-out, opacity 180ms ease-out; }
+    .coagent-paths > path[data-state="drawn"] { stroke-dashoffset: 0; opacity: 0.16; }
+    .coagent-paths > path[data-state="active"], .coagent-paths > path[data-state="repair"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .coagent-paths > path[data-state="compare"], .coagent-paths > path[data-state="notify"] { stroke: var(--red); stroke-dashoffset: 0; opacity: 1; }
+    .edge-label { position: absolute; z-index: 3; padding: 0.18rem 0.35rem; border-radius: 99rem; background: var(--ink-raised); color: var(--accent); font-size: 0.52rem; white-space: nowrap; opacity: 0; transform: translate(-50%, 0.35rem); transition: opacity 180ms ease-out, transform 180ms ease-out, color 180ms ease-out; }
+    .edge-label[data-state="active"], .edge-label[data-state="compare"], .edge-label[data-state="notify"], .edge-label[data-state="repair"] { opacity: 1; transform: translate(-50%, 0); }
+    .edge-label[data-state="compare"], .edge-label[data-state="notify"] { color: var(--red); }
+    .edge-label--lin-read { inset: 22% auto auto 70%; }
+    .edge-label--mira-read { inset: 43% auto auto 8%; }
+    .edge-label--ada-write { inset: 24% auto auto 34%; }
+    .edge-label--used { inset: 67% auto auto 68%; }
+    .edge-label--current { inset: 29% auto auto 54%; }
+    .edge-label--notify { inset: 38% auto auto 69%; }
+    .scene-object, .scene-agent, .scene-artifact, .conflict-engine { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
+    .scene-object { display: grid; inline-size: 7.6rem; min-block-size: 3.8rem; place-content: center; border: 1px solid var(--line-strong); border-radius: 0.45rem; background: var(--ink-raised); text-align: center; transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out; }
+    .scene-object strong { font-size: 0.76rem; }
+    .scene-object small { color: var(--faint); font-size: 0.58rem; }
+    .scene-object[data-state="changed"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -50%) scale(1.05); }
+    .scene-object--issue { inset: 10% auto auto 13%; }
+    .scene-object--parser { inset: 10% auto auto 50%; }
+    .scene-agent { display: grid; inline-size: 6.7rem; aspect-ratio: 1; place-content: center; gap: 0.18rem; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-raised); text-align: center; transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out; }
+    .scene-agent strong { font-family: var(--body); font-size: 0.88rem; }
+    .scene-agent small { max-inline-size: 8.5rem; color: var(--faint); font-size: 0.57rem; white-space: nowrap; }
+    .scene-agent[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -50%) scale(1.06); }
+    .scene-agent[data-state="conflict"] { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+    .scene-agent[data-state="repair"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .scene-agent--ada { inset: 43% auto auto 18%; }
+    .scene-agent--lin { inset: 43% auto auto 82%; }
+    .scene-agent--mira { inset: 80% auto auto 18%; }
+    .conflict-engine { inset: 48% auto auto 50%; display: grid; inline-size: 13rem; min-block-size: 6.6rem; align-content: center; gap: 0.45rem; padding: 0.8rem; border: 1px solid var(--line-strong); border-radius: 0.55rem; background: var(--ink-raised); text-align: center; transition: border-color 180ms ease-out, background-color 180ms ease-out, transform 180ms ease-out; }
+    .engine-title { font-family: var(--body); font-size: 0.7rem; }
+    .version-compare { display: flex; align-items: center; justify-content: center; gap: 0.45rem; opacity: 0; transform: translateY(0.35rem); transition: opacity 180ms ease-out, transform 220ms ease-out; }
+    .version-compare span { display: grid; min-inline-size: 3.2rem; min-block-size: 2rem; place-items: center; border: 1px solid var(--line-strong); border-radius: 0.3rem; color: var(--muted); font-size: 0.58rem; }
+    .version-compare b { color: var(--faint); font-size: 0.75rem; }
+    .engine-result { color: var(--faint); font-size: 0.56rem; font-weight: 500; white-space: nowrap; }
+    .conflict-engine[data-state="compare"] { border-color: var(--red); background: var(--red-soft); transform: translate(-50%, -50%) scale(1.04); }
+    .conflict-engine[data-state="compare"] .version-compare, .conflict-engine[data-state="repair"] .version-compare { opacity: 1; transform: translateY(0); }
+    .conflict-engine[data-state="compare"] .version-compare span, .conflict-engine[data-state="compare"] .engine-result, .conflict-engine[data-state="compare"] .version-compare b { border-color: var(--red); color: var(--red); }
+    .conflict-engine[data-state="repair"] { border-color: var(--accent); background: var(--accent-soft); }
+    .conflict-engine[data-state="repair"] .version-compare span, .conflict-engine[data-state="repair"] .engine-result, .conflict-engine[data-state="repair"] .version-compare b { border-color: var(--accent); color: var(--accent); }
+    .scene-artifact { display: grid; inline-size: 8.5rem; min-block-size: 4.2rem; place-content: center; gap: 0.16rem; border: 1px solid var(--line-strong); border-radius: 0.35rem; background: var(--ink-raised); text-align: center; opacity: 0; transition: opacity 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out; }
+    .scene-artifact strong { font-size: 0.66rem; }
+    .scene-artifact small { color: currentColor; font-size: 0.54rem; opacity: 0.72; }
+    .scene-artifact[data-state="created"], .scene-artifact[data-state="preserved"], .scene-artifact[data-state="invalid"], .scene-artifact[data-state="updated"] { opacity: 1; }
+    .scene-artifact[data-state="created"], .scene-artifact[data-state="preserved"] { border-color: var(--accent); color: var(--accent); }
+    .scene-artifact[data-state="invalid"] { border-color: var(--red); background: var(--red-soft); color: var(--red); transform: translate(-50%, -50%) rotate(-2deg); }
+    .scene-artifact[data-state="updated"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -50%) scale(1.04); }
+    .scene-artifact--docs { inset: 82% auto auto 50%; }
+    .scene-artifact--test { inset: 82% auto auto 82%; }
+    @media (max-width: 42rem) { .coagent-scene { min-block-size: 22rem; } .scene-object { inline-size: 6rem; } .scene-agent { inline-size: 5rem; } .conflict-engine { inline-size: 9.5rem; min-block-size: 5.5rem; } .version-compare span { min-inline-size: 2.5rem; } .scene-artifact { inline-size: 6.2rem; } }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="02-ticket-sequencer.html">Sequencer</a><a href="04-latte.html">下一页：LATTE</a></nav></header>
   <main id="main">
-    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">03 · Semantic concurrency control</span><h1 class="spacer-top">CoAgent / <span class="accent-yellow">MTPO</span></h1><p>固定 serialization order，但允许 Agent 投机执行。发生冲突时，runtime 只通知真正读过被修改对象的人，Agent 只修复依赖该前提的操作。</p></div></section>
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">03 · Semantic repair</span><h1 class="spacer-top">CoAgent / <span class="accent-yellow">MTPO</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">对象 X 变了，不等于整个世界失效</h2><p>下面的 B 读取了 `parser.py`，C 没有。当 A 的写入到达时，只有 B 的一段 trajectory 被污染。</p></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">仓库依赖变化后的局部修复</h2></div>
       <div class="split">
         <div class="stage" data-demo="coagent">
-          <div class="stage-topbar"><span class="stage-label">MTPO / monotonic trajectory</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待 launch</span></span></div>
           <div class="stage-canvas">
-            <div class="order-line" aria-label="序列化顺序"><span class="order-chip" data-order="0">A</span><span>≺</span><span class="order-chip" data-order="1">B</span><span>≺</span><span class="order-chip" data-order="2">C</span></div>
-            <div class="trajectory-grid">
-              <div class="trajectory" data-lane="0"><span class="trajectory-name">A · low</span><div class="ops"><span class="op" data-op="a-read">read task:17</span><span class="op" data-op="a-write">write parser.py</span></div><span class="notification" data-note="0">quiet</span></div>
-              <div class="trajectory" data-lane="1"><span class="trajectory-name">B · mid</span><div class="ops"><span class="op" data-op="b-read">read parser.py</span><span class="op" data-op="b-plan">edit tests</span></div><span class="notification" data-note="1">quiet</span></div>
-              <div class="trajectory" data-lane="2"><span class="trajectory-name">C · high</span><div class="ops"><span class="op" data-op="c-read">read task:17</span><span class="op" data-op="c-plan">write docs</span></div><span class="notification" data-note="2">quiet</span></div>
+            <div class="coagent-scene" aria-label="三个编码 Agent 通过实际工具调用形成读写轨迹，Runtime 只修复被 parser.py 更新影响的测试">
+              <svg class="coagent-paths" viewBox="0 0 1000 440" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="coagent-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="lin-read" d="M500 66 C625 72 708 136 773 174"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="mira-read" d="M130 68 C92 156 104 286 158 335"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="ada-write" d="M228 171 C320 116 404 74 464 61"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="parser-current" d="M500 82 L500 155"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="test-used" d="M770 340 C700 311 650 270 603 234"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="notify" d="M604 196 C667 174 716 171 773 179"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="lin-artifact" d="M820 236 L820 339"/>
+                <path pathLength="1" marker-end="url(#coagent-arrow)" data-edge="mira-artifact" d="M232 351 L452 358"/>
+              </svg>
+
+              <span class="edge-label edge-label--lin-read" data-edge-label="lin-read">读取 v1</span>
+              <span class="edge-label edge-label--mira-read" data-edge-label="mira-read">读取需求</span>
+              <span class="edge-label edge-label--ada-write" data-edge-label="ada-write">写入 v2</span>
+              <span class="edge-label edge-label--current" data-edge-label="parser-current">当前 v2</span>
+              <span class="edge-label edge-label--used" data-edge-label="test-used">产物依赖 v1</span>
+              <span class="edge-label edge-label--notify" data-edge-label="notify">要求 Lin 重做</span>
+
+              <div class="scene-object scene-object--issue" data-scene-object="issue"><strong>issue #417</strong><small>需求</small></div>
+              <div class="scene-object scene-object--parser" data-scene-object="parser"><strong>parser.py</strong><small data-parser-version>v1</small></div>
+
+              <div class="scene-agent scene-agent--ada" data-agent-node="ada"><strong>Ada</strong><small>修改 parser API</small></div>
+              <div class="scene-agent scene-agent--lin" data-agent-node="lin"><strong>Lin</strong><small>生成回归测试</small></div>
+              <div class="scene-agent scene-agent--mira" data-agent-node="mira"><strong>Mira</strong><small>更新迁移文档</small></div>
+
+              <div class="conflict-engine" data-conflict-engine>
+                <strong class="engine-title">Runtime</strong>
+                <div class="version-compare"><span data-runtime-used>Lin 产物<br>v1</span><b data-compare-symbol>vs</b><span data-runtime-current>当前文件<br>v1</span></div>
+                <strong class="engine-result" data-engine-result>检查产物依赖</strong>
+              </div>
+
+              <div class="scene-artifact scene-artifact--docs" data-artifact="docs"><strong>migration.md</strong><small data-artifact-version="docs">读取 issue #417</small></div>
+              <div class="scene-artifact scene-artifact--test" data-artifact="test"><strong>Lin 的 parser_test.py</strong><small data-artifact-version="test">基于 parser.py v1</small></div>
             </div>
-            <div class="resource-grid" aria-label="共享资源">
-              <div class="resource" data-resource="task"><strong>task:17</strong><span>stable</span></div>
-              <div class="resource" data-resource="parser"><strong>repo:/parser.py</strong><span data-parser-version>version α</span></div>
-              <div class="resource" data-resource="docs"><strong>repo:/docs</strong><span>independent</span></div>
-            </div>
-            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">order</span><span class="phase">footprint</span><span class="phase">speculate</span><span class="phase">notify</span><span class="phase">repair</span></div>
           </div>
-          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="CoAgent 解释">
-          <div class="metric-grid"><div class="metric"><span class="metric-label">Reported speedup</span><div class="metric-value">1.4×</div><p class="metric-note">十个竞争工作负载</p></div><div class="metric"><span class="metric-label">Repair scope</span><div class="metric-value">⊂</div><p class="metric-note">局部依赖链</p></div></div>
           <div class="formula"><span class="accent-blue">reads</span> ∩ <span class="accent-yellow">writes</span> ≠ ∅ → notify</div>
-          <div class="callout"><strong>核心变化</strong><p>从 global OCC 进入 resource-scoped、dependency-aware concurrency control。</p></div>
-          <div class="callout" style="border-color: var(--yellow);"><strong>强前提</strong><p>共享状态必须经过注册工具；footprint 和 inverse 必须正确。</p></div>
+          <div class="callout" style="border-color: var(--yellow);"><strong>实现前提</strong><p>所有仓库读取与写入必须被记录；未经过工具的访问无法参与依赖判断。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2606.15376">阅读 CoAgent 论文 ↗</a>
         </aside>
       </div>

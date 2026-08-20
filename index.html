@@ -3,155 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="用可交互动画理解 Held Draft、CoAgent、LATTE、SyncPlan、Atomix、Cordon 与 TraceFix。">
-  <title>Agent-native concurrency, visualized</title>
+  <meta name="description" content="多智能体并发协调机制的无限画布式交互图谱。">
+  <title>awesome-agent-concurrency</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/site.css">
-  <style>
-    .hero-title { max-inline-size: 13ch; }
-    .thesis-stage { min-block-size: 40rem; }
-    .comparison { display: grid; grid-template-columns: 1fr 1fr; min-block-size: 29rem; }
-    .comparison-side { display: grid; align-content: start; gap: 1.1rem; padding: clamp(1rem, 3vw, 2rem); }
-    .comparison-side + .comparison-side { border-inline-start: 1px solid var(--line); }
-    .comparison-kicker { color: var(--muted); font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; }
-    .comparison-title { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-    .comparison-title strong { font-family: var(--display); font-size: clamp(1.35rem, 3vw, 2rem); }
-    .complexity { color: var(--faint); font-family: var(--mono); font-size: clamp(0.8rem, 2vw, 1.05rem); }
-    .dot-field { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.55rem; min-block-size: 9rem; align-content: center; }
-    .overview-agent { display: grid; min-block-size: 2.7rem; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.65rem; transition-property: transform, opacity, border-color, background-color, color; transition-duration: 300ms; }
-    .overview-agent[data-state="draft"] { border-color: var(--yellow); color: var(--yellow); transform: translateY(-0.2rem); }
-    .overview-agent[data-state="held"] { border-color: var(--red); background: oklch(0.21 0.065 25); color: var(--red); transform: translateX(0.25rem); }
-    .overview-agent[data-state="commit"] { border-color: var(--green); background: oklch(0.2 0.05 148); color: var(--green); }
-    .overview-agent[data-state="slot"] { border-color: var(--blue); color: var(--blue); }
-    .agent-number { font-size: 0.6rem; opacity: 0.7; }
-    .comparison-equation { min-block-size: 4.5rem; display: grid; place-items: center; border-radius: var(--radius-sm); background: oklch(0.1 0.02 264 / 0.68); color: var(--faint); font-family: var(--mono); font-size: clamp(0.72rem, 2vw, 0.92rem); text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
-    .comparison-equation[data-state="result"] { color: var(--yellow); }
-    .comparison-side:last-child .comparison-equation[data-state="result"] { color: var(--green); }
-    .layer-stack { display: grid; gap: 0.55rem; max-inline-size: 58rem; margin-inline: auto; }
-    .layer-row { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; align-items: center; gap: 1rem; min-block-size: 4.5rem; padding: 0.85rem 1rem; border-radius: var(--radius-md); background: var(--ink-raised); box-shadow: inset 0 0 0 1px var(--line); }
-    .layer-index { color: var(--layer-color); font-family: var(--display); font-size: 1.5rem; }
-    .layer-row strong { display: block; font-size: 0.92rem; }
-    .layer-row small { color: var(--muted); }
-    .layer-protocol { color: var(--layer-color); font-family: var(--mono); font-size: 0.7rem; text-align: end; }
-    @media (max-width: 44rem) {
-      .comparison { grid-template-columns: 1fr; }
-      .comparison-side + .comparison-side { border-inline-start: 0; border-block-start: 1px solid var(--line); }
-      .dot-field { grid-template-columns: repeat(10, minmax(0, 1fr)); min-block-size: 5rem; }
-      .overview-agent { min-block-size: 1.6rem; font-size: 0.55rem; }
-      .thesis-stage { min-block-size: 52rem; }
-      .layer-row { grid-template-columns: 2rem minmax(0, 1fr); }
-      .layer-protocol { grid-column: 2; text-align: start; }
-    }
-  </style>
+  <link rel="stylesheet" href="assets/canvas.css">
 </head>
-<body>
-  <a class="skip-link" href="#main">跳到主要内容</a>
-  <header class="site-header page-shell">
-    <a class="brand" href="index.html" aria-label="Agent-native concurrency 首页">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span>Agent × Runtime</span>
+<body class="canvas-page">
+  <a class="skip-link" href="#canvas-viewport">跳到画布</a>
+
+  <header class="canvas-header">
+    <div class="canvas-location" aria-live="polite">
+      <span data-location-index>01</span>
+      <strong data-location-title>Held Draft</strong>
+    </div>
+    <a class="canvas-github" href="https://github.com/chengyongru/awesome-agent-concurrency" aria-label="在 GitHub 查看项目">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.59 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49v-1.92c-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.89 1.57 2.34 1.12 2.91.86.09-.67.35-1.12.64-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.04 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.69a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.71 1.03 1.63 1.03 2.75 0 3.94-2.35 4.81-4.58 5.07.36.32.68.94.68 1.89v3.08c0 .27.18.59.69.49A10.27 10.27 0 0 0 22 12.25C22 6.59 17.52 2 12 2Z"/></svg>
     </a>
-    <nav class="site-nav" aria-label="主要导航">
-      <a href="#thesis">核心对照</a>
-      <a href="#atlas">算法图谱</a>
-      <a href="https://github.com/chengyongru/awesome-agent-concurrency">GitHub</a>
-    </nav>
   </header>
 
-  <main id="main">
-    <section class="hero page-shell">
-      <div class="hero-copy">
-        <span class="eyebrow">Interactive field notes · 2026</span>
-        <h1 class="hero-title spacer-top">并行不是问题。<span class="accent-yellow">无知的并行</span>才是。</h1>
-        <p>从全局版本冲突到语义依赖，从动态任务图到副作用结算：亲手推进每一步，看多 Agent 系统怎样避免重复推理、错误提交与不可逆事故。</p>
-        <div class="hero-actions">
-          <a class="button button--primary" href="#thesis">运行第一场实验</a>
-          <a class="button" href="#atlas">浏览 8 个机制</a>
-        </div>
-      </div>
-    </section>
+  <main class="canvas-app" data-canvas-app>
+    <h1 class="sr-only">多智能体并发协调机制</h1>
+    <nav class="canvas-navigator" id="canvas-index" data-canvas-navigator data-collapsed="false" aria-label="画布位置">
+      <button class="navigator-toggle" type="button" data-navigator-toggle aria-controls="canvas-index" aria-expanded="true" aria-label="收起算法导航">
+        <span aria-hidden="true">
+          <svg class="navigator-toggle-collapse" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></svg>
+          <svg class="navigator-toggle-expand" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></svg>
+        </span>
+      </button>
+      <button class="navigator-item" type="button" data-jump="held-draft" aria-current="true"><span>01</span><strong>Held Draft</strong></button>
+      <button class="navigator-item" type="button" data-jump="sequencer"><span>02</span><strong>Sequencer</strong></button>
+      <button class="navigator-item" type="button" data-jump="coagent"><span>03</span><strong>CoAgent</strong></button>
+      <button class="navigator-item" type="button" data-jump="latte"><span>04</span><strong>LATTE</strong></button>
+      <button class="navigator-item" type="button" data-jump="syncplan"><span>05</span><strong>SyncPlan</strong></button>
+      <button class="navigator-item" type="button" data-jump="atomix"><span>06</span><strong>Atomix</strong></button>
+      <button class="navigator-item" type="button" data-jump="cordon"><span>07</span><strong>Cordon</strong></button>
+      <button class="navigator-item" type="button" data-jump="tracefix"><span>08</span><strong>TraceFix</strong></button>
+    </nav>
 
-    <section class="section page-shell" id="thesis" aria-labelledby="thesis-title">
-      <div class="section-heading">
-        <span class="eyebrow">The thesis</span>
-        <h2 id="thesis-title">同一批 Agent，两种协调代价</h2>
-        <p>Held Draft 让所有 Agent 先争抢，再用失败形成顺序；Sequencer 先分配顺序，计算仍然可以并行。拖动 Agent 数量，然后单步观察两边如何分叉。</p>
-      </div>
+    <div class="canvas-viewport" id="canvas-viewport" data-canvas-viewport tabindex="0" aria-label="机制图谱画布。拖动以平移，按住 Ctrl 或 Command 滚动以缩放。">
+      <div class="canvas-world" data-canvas-world>
+        <article class="canvas-frame algorithm-frame" data-canvas-node="held-draft" data-index="01" data-title="Held Draft" style="--x: -4200px; --y: 800px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>并发报数</h2></header>
+          <div class="node-demo-slot" data-demo-slot="held-draft"><span>加载实验 01…</span></div>
+        </article>
 
-      <div class="stage thesis-stage" data-demo="overview">
-        <div class="stage-topbar">
-          <span class="stage-label">Experiment 00 · contention</span>
-          <span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待开始</span></span>
-        </div>
-        <div class="comparison">
-          <section class="comparison-side" aria-labelledby="occ-title">
-            <span class="comparison-kicker">Optimistic retry</span>
-            <div class="comparison-title"><strong id="occ-title">Held Draft</strong><span class="complexity">O(n²)</span></div>
-            <div class="dot-field" data-left-agents aria-label="Held Draft Agent 状态"></div>
-            <div class="comparison-equation" data-left-equation>所有 Agent 基于 v₀ 推理</div>
-          </section>
-          <section class="comparison-side" aria-labelledby="seq-title">
-            <span class="comparison-kicker">Pre-ordered release</span>
-            <div class="comparison-title"><strong id="seq-title">Sequencer</strong><span class="complexity">O(n)</span></div>
-            <div class="dot-field" data-right-agents aria-label="Sequencer Agent 状态"></div>
-            <div class="comparison-equation" data-right-equation>等待原子分配 slot</div>
-          </section>
-        </div>
-        <div class="stage-controls">
-          <div class="control-group">
-            <button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button>
-            <button class="button control-button" type="button" data-action="step">单步</button>
-            <button class="button control-button" type="button" data-action="reset">重置</button>
-          </div>
-          <label class="range-wrap">Agent 数量：<output data-agent-output>6</output>
-            <input type="range" min="3" max="20" value="6" data-agent-range>
-          </label>
-          <div class="progress-group" aria-hidden="true">
-            <div class="progress-track"><span class="progress-fill"></span></div>
-            <span class="step-count">00 / 06</span>
-          </div>
-        </div>
-        <p class="sr-only" role="status" aria-live="polite" data-live></p>
-      </div>
-    </section>
+        <article class="canvas-frame algorithm-frame" data-canvas-node="sequencer" data-index="02" data-title="子 Agent 结果汇聚" style="--x: -1400px; --y: 800px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>子 Agent 结果汇聚</h2></header>
+          <div class="node-demo-slot" data-demo-slot="sequencer"><span>加载实验 02…</span></div>
+        </article>
 
-    <section class="section page-shell" aria-labelledby="stack-title">
-      <div class="section-heading center" style="margin-inline: auto;">
-        <span class="eyebrow" style="justify-content: center;">The runtime stack</span>
-        <h2 id="stack-title">下一代方案不是更聪明的重试</h2>
-        <p style="margin-inline: auto;">它是一套分层协调系统：先减少不必要的竞争，再缩小冲突范围，最后把真实世界的副作用关进提交门。</p>
-      </div>
-      <div class="layer-stack" aria-label="分层协调系统">
-        <div class="layer-row" style="--layer-color: var(--blue);"><span class="layer-index">Ⅰ</span><div><strong>Task scheduling</strong><small>只唤醒 ready 的工作</small></div><span class="layer-protocol">DAG · frontier · claim</span></div>
-        <div class="layer-row" style="--layer-color: var(--yellow);"><span class="layer-index">Ⅱ</span><div><strong>Semantic concurrency</strong><small>只修复被污染的依赖链</small></div><span class="layer-protocol">footprint · notify · repair</span></div>
-        <div class="layer-row" style="--layer-color: var(--green);"><span class="layer-index">Ⅲ</span><div><strong>Transactional effects</strong><small>不可逆动作延迟到 commit</small></div><span class="layer-protocol">stage · validate · settle</span></div>
-        <div class="layer-row" style="--layer-color: var(--violet);"><span class="layer-index">Ⅳ</span><div><strong>Protocol verification</strong><small>穷举并发交错中的坏结局</small></div><span class="layer-protocol">model check · counterexample</span></div>
-      </div>
-    </section>
+        <article class="canvas-frame algorithm-frame" data-canvas-node="coagent" data-index="03" data-title="局部依赖修复" style="--x: 1400px; --y: 800px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>局部依赖修复</h2></header>
+          <div class="node-demo-slot" data-demo-slot="coagent"><span>加载实验 03…</span></div>
+        </article>
 
-    <section class="section page-shell" id="atlas" aria-labelledby="atlas-title">
-      <div class="section-heading">
-        <span class="eyebrow">Algorithm atlas</span>
-        <h2 id="atlas-title">从安全阀，到 Agent-native concurrency</h2>
-        <p>每页都是一台可操作的协议显微镜。按顺序学习，也可以直接进入与你当前问题最接近的一页。</p>
+        <article class="canvas-frame algorithm-frame" data-canvas-node="latte" data-index="04" data-title="动态任务图调度" style="--x: 4200px; --y: 800px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>动态任务图调度</h2></header>
+          <div class="node-demo-slot" data-demo-slot="latte"><span>加载实验 04…</span></div>
+        </article>
+
+        <article class="canvas-frame algorithm-frame" data-canvas-node="syncplan" data-index="05" data-title="服务发布同步" style="--x: 4200px; --y: 3400px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>服务发布同步</h2></header>
+          <div class="node-demo-slot" data-demo-slot="syncplan"><span>加载实验 05…</span></div>
+        </article>
+
+        <article class="canvas-frame algorithm-frame" data-canvas-node="atomix" data-index="06" data-title="差旅副作用结算" style="--x: 1400px; --y: 3400px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>差旅副作用结算</h2></header>
+          <div class="node-demo-slot" data-demo-slot="atomix"><span>加载实验 06…</span></div>
+        </article>
+
+        <article class="canvas-frame algorithm-frame" data-canvas-node="cordon" data-index="07" data-title="扩容授权检查" style="--x: -1400px; --y: 3400px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>扩容授权检查</h2></header>
+          <div class="node-demo-slot" data-demo-slot="cordon"><span>加载实验 07…</span></div>
+        </article>
+
+        <article class="canvas-frame algorithm-frame" data-canvas-node="tracefix" data-index="08" data-title="共享文件锁验证" style="--x: -4200px; --y: 3400px; --node-width: 1120px; --node-height: 720px;" tabindex="-1">
+          <header class="node-heading"><h2>共享文件锁验证</h2></header>
+          <div class="node-demo-slot" data-demo-slot="tracefix"><span>加载实验 08…</span></div>
+        </article>
       </div>
-      <div class="atlas">
-        <a class="atlas-card" href="algorithms/01-held-draft.html" style="--card-color: var(--red);"><span class="atlas-index">01 · Global OCC</span><div><h3>Held Draft</h3><p>让陈旧消息停在提交边界，观察高竞争如何产生三角形重试成本。</p></div><span class="atlas-meta"><span>Room version</span><span>O(n²) worst case →</span></span></a>
-        <a class="atlas-card" href="algorithms/02-ticket-sequencer.html" style="--card-color: var(--green);"><span class="atlas-index">02 · Deterministic order</span><div><h3>Ticket / Sequencer</h3><p>原子分配顺序，计算并行、发布有序；同样的任务只需要线性协调。</p></div><span class="atlas-meta"><span>fetch_add</span><span>O(n) →</span></span></a>
-        <a class="atlas-card" href="algorithms/03-coagent.html" style="--card-color: var(--yellow);"><span class="atlas-index">03 · Semantic repair</span><div><h3>CoAgent / MTPO</h3><p>追踪读写 footprint，只通知真正受影响的 Agent，并局部修复计划。</p></div><span class="atlas-meta"><span>Notify + inverse</span><span>Open demo →</span></span></a>
-        <a class="atlas-card" href="algorithms/04-latte.html" style="--card-color: var(--blue);"><span class="atlas-index">04 · Adaptive graph</span><div><h3>LATTE</h3><p>让 task DAG 决定谁该醒来，ready frontier 决定谁现在可以工作。</p></div><span class="atlas-meta"><span>DAG + claim</span><span>Open demo →</span></span></a>
-        <a class="atlas-card" href="algorithms/05-syncplan.html" style="--card-color: var(--violet);"><span class="atlas-index">05 · Explicit sync</span><div><h3>SyncPlan</h3><p>把等待、barrier 与 deadlock 变成 runtime 原语，减少自然语言轮询。</p></div><span class="atlas-meta"><span>Milestone + wait</span><span>Open demo →</span></span></a>
-        <a class="atlas-card" href="algorithms/06-atomix.html" style="--card-color: var(--green);"><span class="atlas-index">06 · Effect settlement</span><div><h3>Atomix</h3><p>工具返回不等于永久生效；effect 要经过 seal、frontier 与 settlement。</p></div><span class="atlas-meta"><span>Open → settle</span><span>Open demo →</span></span></a>
-        <a class="atlas-card" href="algorithms/07-cordon.html" style="--card-color: var(--yellow);"><span class="atlas-index">07 · Semantic commit</span><div><h3>Cordon</h3><p>沿 lineage 检查每个外部动作“为什么被允许”，再决定 commit 或 abort。</p></div><span class="atlas-meta"><span>Lineage + authority</span><span>Open demo →</span></span></a>
-        <a class="atlas-card" href="algorithms/08-tracefix.html" style="--card-color: var(--violet);"><span class="atlas-index">08 · Formal repair</span><div><h3>TraceFix</h3><p>让 model checker 穷举协调协议，拿着反例修复死锁与安全漏洞。</p></div><span class="atlas-meta"><span>TLA+ counterexample</span><span>Open demo →</span></span></a>
-      </div>
-    </section>
+    </div>
+
+    <div class="canvas-controls" aria-label="画布缩放">
+      <button type="button" data-zoom-out aria-label="缩小">−</button>
+      <output data-zoom-output aria-live="polite">100%</output>
+      <button type="button" data-zoom-in aria-label="放大">＋</button>
+      <button type="button" data-fit aria-label="返回当前节点">⌖</button>
+    </div>
+    <div class="canvas-shortcuts" aria-hidden="true">拖动平移 · Ctrl / ⌘ + 滚轮缩放</div>
+    <p class="sr-only" role="status" aria-live="polite" data-canvas-live></p>
   </main>
 
-  <footer class="site-footer page-shell">
-    <span>Visual interpretation, not a reference implementation.</span>
-    <span>MIT · <span data-year>2026</span></span>
-  </footer>
   <script type="module" src="assets/index.js"></script>
 </body>
 </html>

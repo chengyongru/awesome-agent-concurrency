@@ -3,55 +3,87 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 Ticket Allocator / Sequencer：计算并行，提交有序。">
+  <meta name="description" content="交互演示 Sequencer 如何将并行子 Agent 的乱序返回确定性地写入主 Agent 上下文。">
   <title>Ticket / Sequencer · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 14ch; font-size: clamp(2.7rem, 7.5vw, 5.8rem); }
-    .allocator { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; gap: 1.2rem; align-items: center; margin-block-end: var(--space-4); }
-    .allocator-copy strong { display: block; font-family: var(--display); font-size: 1.45rem; }
-    .allocator-copy small { color: var(--muted); font-family: var(--mono); }
-    .counter { display: grid; aspect-ratio: 1; place-items: center; border: 1px solid var(--yellow); border-radius: var(--radius-md); background: oklch(0.19 0.05 94 / 0.3); color: var(--yellow); font-family: var(--display); font-size: 2rem; box-shadow: 0 0 2rem oklch(0.885 0.15 94 / 0.12); }
-    .slot-row { display: grid; grid-template-columns: repeat(var(--slot-count, 4), minmax(2.6rem, 1fr)); gap: 0.45rem; margin-block: var(--space-4); }
-    .slot { display: grid; min-block-size: 4.3rem; place-items: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--faint); font-family: var(--mono); font-size: 0.7rem; transition-property: border-color, background-color, color, transform; transition-duration: 300ms; }
-    .slot[data-state="reserved"] { border-style: solid; border-color: var(--blue); color: var(--blue); transform: translateY(-0.25rem); }
-    .slot[data-state="ready"] { border-style: solid; border-color: var(--yellow); color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); }
-    .slot[data-state="released"] { border-style: solid; border-color: var(--green); color: var(--green); background: oklch(0.2 0.05 148 / 0.32); }
-    .release-line { position: relative; block-size: 3rem; margin-block-start: 1rem; border-block-start: 2px solid var(--line-strong); }
-    .release-marker { position: absolute; inset-block-start: -0.43rem; inset-inline-start: var(--release, 0%); inline-size: 0.75rem; block-size: 0.75rem; border-radius: 50%; background: var(--green); box-shadow: 0 0 1rem var(--green); transition: inset-inline-start 420ms ease-out; }
-    .release-line span { position: absolute; inset-block-start: 0.7rem; color: var(--faint); font-family: var(--mono); font-size: 0.62rem; }
+    .sequencer-summary { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 1rem; min-block-size: 2.6rem; margin-block-end: 0.65rem; font-family: var(--mono); font-size: 0.76rem; }
+    .sequencer-summary strong { color: var(--accent); font-weight: 650; white-space: nowrap; }
+    .return-order { display: flex; min-inline-size: 0; align-items: center; justify-content: center; gap: 0.6rem; color: var(--faint); font-size: 0.66rem; white-space: nowrap; }
+    .return-order-list { display: flex; min-inline-size: 0; align-items: center; gap: 0.42rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .return-order-list > span { display: inline-flex; align-items: center; font-weight: 650; }
+    .return-order-list > span:not(:last-child)::after { content: '→'; margin-inline-start: 0.42rem; color: var(--faint); font-weight: 400; }
+    .return-order-list .return-order-empty { color: var(--faint); font-weight: 400; }
+    .return-order-entry { animation: return-order-enter 180ms cubic-bezier(0.2, 0, 0, 1) both; }
+    .sequence-table { font-family: var(--mono); font-size: 0.76rem; }
+    .sequence-header,
+    .sequence-row { display: grid; grid-template-columns: minmax(11rem, 1.35fr) minmax(5.5rem, 0.65fr) minmax(12rem, 1.8fr) 7.8rem; gap: 1rem; align-items: center; }
+    .sequence-header { min-block-size: 2rem; color: var(--faint); font-size: 0.65rem; letter-spacing: 0.06em; }
+    .sequence-rows { display: grid; }
+    .sequence-row { position: relative; min-block-size: 3.25rem; padding-inline: 0.7rem; border-block-start: 1px solid var(--line); transition: background-color 180ms ease-out, color 180ms ease-out; }
+    .sequence-row:last-child { border-block-end: 1px solid var(--line); }
+    .sequence-row::before { content: ''; position: absolute; inset-block: 0.65rem; inset-inline-start: 0; inline-size: 0.2rem; background: transparent; }
+    .sequence-row[data-frontier="true"]::before { background: var(--accent); }
+    .sequence-row[data-state="buffered"] { background: color-mix(in oklch, var(--accent-soft) 44%, transparent); }
+    .sequence-row[data-state="published"] { background: var(--accent-soft); color: var(--accent); }
+    .sequence-case { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .sequence-agent { white-space: nowrap; }
+    .sequence-work { display: grid; grid-template-columns: 5.8rem minmax(4rem, 1fr); gap: 0.7rem; align-items: center; min-inline-size: 0; }
+    .sequence-work > span { color: var(--muted); font-size: 0.68rem; white-space: nowrap; }
+    .sequence-track { position: relative; display: block; block-size: 0.28rem; overflow: hidden; background: var(--line); }
+    .sequence-track i { display: block; inline-size: 100%; block-size: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left center; }
+    .sequence-progress[data-running="true"] { animation: sequencer-progress var(--work-duration, 1s) linear forwards; }
+    .sequence-state { justify-self: end; min-inline-size: 5.2rem; color: var(--muted); text-align: end; white-space: nowrap; }
+    .sequence-row[data-state="buffered"] .sequence-state,
+    .sequence-row[data-state="published"] .sequence-state { color: var(--accent); font-weight: 650; }
+    .publish-log { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1rem; align-items: center; margin-block-start: 0.75rem; color: var(--muted); font-family: var(--mono); font-size: 0.68rem; }
+    .publish-log > div { display: grid; grid-template-columns: repeat(var(--case-count, 4), minmax(0, 1fr)); gap: 0.35rem; }
+    .publish-log i { display: grid; min-block-size: 1.65rem; overflow: hidden; place-items: center; border-block-end: 2px solid var(--line); color: var(--faint); font-style: normal; text-overflow: ellipsis; white-space: nowrap; transition: background-color 180ms ease-out, border-color 180ms ease-out, color 180ms ease-out; }
+    .publish-log i[data-state="published"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+    @keyframes sequencer-progress { to { transform: scaleX(1); } }
+    @keyframes return-order-enter { from { opacity: 0; filter: blur(4px); transform: scale(0.25); } to { opacity: 1; filter: blur(0); transform: scale(1); } }
+    @media (max-width: 42rem) {
+      .sequencer-summary { grid-template-columns: minmax(0, 1fr) max-content; }
+      .return-order { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
+      .return-order-list { flex-wrap: wrap; }
+      .sequence-header { display: none; }
+      .sequence-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.45rem 1rem; padding-block: 0.65rem; }
+      .sequence-agent,
+      .sequence-state { justify-self: end; }
+      .sequence-work { grid-column: 1 / -1; grid-row: 2; }
+    }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="01-held-draft.html">Held Draft</a><a href="03-coagent.html">下一页：CoAgent</a></nav></header>
   <main id="main">
-    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">02 · Deterministic serialization</span><h1 class="spacer-top">Ticket / <span class="accent-green">Sequencer</span></h1><p>先分配顺序，再并行计算。服务器只负责按 ticket 释放结果，不需要让 Agent 通过一次次失败来猜出谁先谁后。</p></div></section>
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">02 · Deterministic order</span><h1 class="spacer-top">Ticket / <span class="accent-green">Sequencer</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">计算可以并行，提交需要有序</h2><p>对于“数到 n”这类已知必须形成全序的任务，原子计数器把协调成本从三角形压回一条直线。</p></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">并行调查与确定性上下文组装</h2></div>
       <div class="split">
         <div class="stage" data-demo="sequencer">
-          <div class="stage-topbar"><span class="stage-label">Runtime / atomic allocator</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待申请</span></span></div>
           <div class="stage-canvas">
-            <div class="allocator"><div class="allocator-copy"><strong data-headline>next_slot 尚未被读取</strong><small data-subline>atomic_fetch_add(next_slot, 1)</small></div><div class="counter" data-counter>1</div></div>
-            <div class="agent-row" data-agents aria-label="Agent 与 ticket"></div>
-            <div class="slot-row" data-slots aria-label="发布槽位"></div>
-            <div class="release-line" aria-label="有序发布进度"><i class="release-marker" data-release-marker></i><span style="inset-inline-start:0;">publish[1]</span><span style="inset-inline-end:0;">publish[n]</span></div>
-            <div class="phase-rail" style="--phase-count: 4;"><span class="phase">allocate</span><span class="phase">compute ∥</span><span class="phase">buffer</span><span class="phase">release →</span></div>
+            <div class="sequencer-summary"><span data-sequencer-phase>诊断任务等待派发</span><div class="return-order"><span>实际返回</span><div class="return-order-list" data-return-order aria-label="子 Agent 实际完成顺序"><span class="return-order-empty">尚无结果</span></div></div><strong data-sequencer-frontier>下一任务 #1</strong></div>
+            <div class="sequence-table" aria-label="子 Agent 诊断任务的派发、调查与返回状态">
+              <div class="sequence-header" aria-hidden="true"><span>诊断顺序</span><span>子 Agent</span><span>实际耗时</span><span>返回状态</span></div>
+              <div class="sequence-rows" data-sequence-rows></div>
+            </div>
+            <div class="publish-log"><span>主 Agent 上下文</span><div data-publish-log aria-label="按任务派发顺序写入的子 Agent 调查结果"></div></div>
           </div>
           <div class="stage-controls">
             <div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div>
-            <label class="range-wrap">Agent 数量：<output data-agent-output>4</output><input type="range" min="3" max="8" value="4" data-agent-range></label>
-            <div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 06</span></div>
+            <label class="range-wrap"><span>Agent 数量：<output data-agent-output>4</output></span><input type="range" min="3" max="8" value="4" data-agent-range></label>
           </div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="Sequencer 解释">
-          <div class="metric-grid"><div class="metric"><span class="metric-label">Coordination</span><div class="metric-value">O(n)</div><p class="metric-note">每个 Agent 一次分配</p></div><div class="metric"><span class="metric-label">Compute</span><div class="metric-value">∥</div><p class="metric-note">仍然可以并行</p></div></div>
-          <div class="code-panel"><span class="code-line"><span class="code-key">slot</span> = atomic_fetch_add(next_slot, <span class="code-value">1</span>)</span><span class="code-line"></span><span class="code-line">compute[slot] <span class="code-key">in parallel</span></span><span class="code-line">release <span class="code-value">in slot order</span></span></div>
-          <div class="callout"><strong>适合</strong><p>顺序在执行前已知，且每个 slot 的工作可以独立生成。</p></div>
-          <div class="callout" style="border-color: var(--yellow);"><strong>不适合</strong><p>下一步必须读取上一步语义结果时，关键路径本来就是串行的。</p></div>
+          <div class="metric-grid"><div class="metric"><span class="metric-label">Dispatch</span><div class="metric-value">O(n)</div><p class="metric-note">每个子任务一个序号</p></div><div class="metric"><span class="metric-label">Investigation</span><div class="metric-value">∥</div><p class="metric-note">子 Agent 并行调查</p></div></div>
+          <div class="code-panel"><span class="code-line"><span class="code-key">ticket</span> = dispatch_order</span><span class="code-line"></span><span class="code-line">result[ticket] <span class="code-key">in parallel</span></span><span class="code-line">append_context <span class="code-value">in ticket order</span></span></div>
+          <div class="callout"><strong>适用条件</strong><p>子任务从同一输入快照生成，彼此可以独立调查。</p></div>
+          <div class="callout" style="border-color: var(--yellow);"><strong>适用限制</strong><p>后一个子任务依赖前一个结果时，必须重新规划任务图。</p></div>
         </aside>
       </div>
     </section>

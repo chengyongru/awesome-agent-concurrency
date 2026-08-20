@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 TraceFix 如何用 PlusCal/TLA+ 模型检查反例修复多 Agent 协调协议。">
+  <meta name="description" content="交互演示如何通过模型检查发现两个编码 Agent 的文件锁死锁，并用统一加锁顺序修复协议。">
   <title>TraceFix · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
@@ -11,17 +11,17 @@
     .algorithm-hero h1 { max-inline-size: 10ch; }
     .trace-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
     .protocol-panel { min-block-size: 17rem; }
-    .model-space { position: relative; min-block-size: 17rem; overflow: hidden; border-radius: var(--radius-md); background: oklch(0.1 0.018 264 / 0.64); box-shadow: inset 0 0 0 1px var(--line); }
+    .model-space { position: relative; min-block-size: 17rem; overflow: hidden; border-radius: var(--radius-md); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); }
     .state-node { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: 4.8rem; min-block-size: 3.1rem; place-content: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.57rem; text-align: center; transform: translate(-50%, -50%); transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
     .state-node[data-state="visited"] { border-color: var(--blue); color: var(--blue); }
-    .state-node[data-state="counterexample"] { border-color: var(--red); color: var(--red); background: oklch(0.2 0.06 25); box-shadow: 0 0 1.2rem oklch(0.68 0.205 25 / 0.2); }
-    .state-node[data-state="safe"] { border-color: var(--green); color: var(--green); background: oklch(0.19 0.05 148 / 0.28); }
+    .state-node[data-state="counterexample"] { border-color: var(--red); color: var(--red); background: var(--red-soft); box-shadow: 0 0 1.2rem color-mix(in oklch, var(--red) 14%, transparent); }
+    .state-node[data-state="safe"] { border-color: var(--green); color: var(--green); background: var(--green-soft); }
     .state-edge { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: 1px; background: var(--line-strong); transform: rotate(var(--r)); transform-origin: left center; }
     .counterexample-trace { display: flex; align-items: center; gap: 0.45rem; min-block-size: 4.2rem; margin-block-start: var(--space-3); padding: 0.65rem; overflow-x: auto; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.62rem; box-shadow: inset 0 0 0 1px var(--line); }
     .trace-step { flex: 0 0 auto; padding: 0.35rem 0.5rem; border-radius: 0.3rem; box-shadow: inset 0 0 0 1px var(--line); }
     .trace-step[data-state="bad"] { color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
     .trace-step[data-state="safe"] { color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
-    .verdict { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3.6rem; margin-block-start: 0.55rem; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.65); color: var(--muted); font-family: var(--mono); font-size: 0.66rem; box-shadow: inset 0 0 0 1px var(--line); }
+    .verdict { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3.6rem; margin-block-start: 0.55rem; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.66rem; box-shadow: inset 0 0 0 1px var(--line); }
     .verdict strong { color: var(--faint); }
     .verdict[data-state="fail"] strong { color: var(--red); }
     .verdict[data-state="pass"] strong { color: var(--green); }
@@ -32,46 +32,43 @@
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="07-cordon.html">Cordon</a><a href="../index.html#atlas">回到图谱</a></nav></header>
   <main id="main">
-    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">08 · Protocol verification</span><h1 class="spacer-top"><span style="color:var(--violet);">Trace</span>Fix</h1><p>不要默认手写的协调协议是正确的。把它转换成 PlusCal / TLA+，穷举并发 interleaving，用具体反例驱动 LLM 修复，再让 runtime 执行已验证拓扑。</p></div></section>
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">08 · Formal verification</span><h1 class="spacer-top"><span style="color:var(--violet);">Trace</span>Fix</h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">把死锁变成一条可重放的反例</h2><p>左边是协议，右边是 model checker 的状态空间。单步推进，直到 A 等 B、B 等 A 的坏状态被发现并修复。</p></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">共享文件锁验证</h2></div>
       <div class="split">
         <div class="stage" data-demo="tracefix">
-          <div class="stage-topbar"><span class="stage-label">Protocol synthesis / bounded check</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>waiting for protocol</span></span></div>
           <div class="stage-canvas">
             <div class="trace-layout">
               <div class="code-panel protocol-panel" aria-label="协调协议伪代码">
-                <span class="code-line" data-code="0"><span class="code-key">agent A</span>:</span>
-                <span class="code-line" data-code="1">  acquire file_x</span>
-                <span class="code-line" data-code="2">  wait until B.done</span>
+                <span class="code-line" data-code="0"><span class="code-key">Ada</span>:</span>
+                <span class="code-line" data-code="1">  lock schema.prisma</span>
+                <span class="code-line" data-code="2">  lock migration.sql</span>
                 <span class="code-line" data-code="3"></span>
-                <span class="code-line" data-code="4"><span class="code-key">agent B</span>:</span>
-                <span class="code-line" data-code="5">  acquire file_y</span>
-                <span class="code-line" data-code="6">  wait until A.done</span>
+                <span class="code-line" data-code="4"><span class="code-key">Lin</span>:</span>
+                <span class="code-line" data-code="5">  lock migration.sql</span>
+                <span class="code-line" data-code="6">  lock schema.prisma</span>
                 <span class="code-line" data-code="7"></span>
-                <span class="code-line" data-code="8"><span class="code-value">invariant</span>: eventually done</span>
+                <span class="code-line" data-code="8"><span class="code-value">性质</span>: 最终释放全部文件锁</span>
               </div>
               <div class="model-space" aria-label="模型检查状态空间">
                 <i class="state-edge" style="--x:22%;--y:24%;--w:33%;--r:25deg;"></i><i class="state-edge" style="--x:22%;--y:24%;--w:33%;--r:65deg;"></i><i class="state-edge" style="--x:51%;--y:47%;--w:31%;--r:43deg;"></i><i class="state-edge" style="--x:41%;--y:68%;--w:38%;--r:-28deg;"></i>
-                <span class="state-node" data-state-node="0" style="--x:20%;--y:22%;">start</span>
-                <span class="state-node" data-state-node="1" style="--x:54%;--y:43%;">A locked</span>
-                <span class="state-node" data-state-node="2" style="--x:40%;--y:70%;">B locked</span>
-                <span class="state-node" data-state-node="3" style="--x:78%;--y:74%;">A ↔ B<br>wait</span>
-                <span class="state-node" data-state-node="4" style="--x:82%;--y:30%;">done</span>
+                <span class="state-node" data-state-node="0" style="--x:20%;--y:22%;">开始</span>
+                <span class="state-node" data-state-node="1" style="--x:54%;--y:43%;">Ada 锁住<br>schema</span>
+                <span class="state-node" data-state-node="2" style="--x:40%;--y:70%;">Lin 锁住<br>migration</span>
+                <span class="state-node" data-state-node="3" style="--x:78%;--y:74%;">双方等待<br>对方文件</span>
+                <span class="state-node" data-state-node="4" style="--x:82%;--y:30%;">全部释放</span>
               </div>
             </div>
-            <div class="counterexample-trace" aria-label="反例轨迹"><span class="trace-step" data-trace="0">s₀ start</span><span>→</span><span class="trace-step" data-trace="1">s₁ A.lock</span><span>→</span><span class="trace-step" data-trace="2">s₂ B.lock</span><span>→</span><span class="trace-step" data-trace="3">s₃ deadlock</span></div>
-            <div class="verdict" data-verdict><span>Model checker</span><strong>not run</strong></div>
-            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">synthesize</span><span class="phase">translate</span><span class="phase">check</span><span class="phase">repair</span><span class="phase">enforce</span></div>
+            <div class="counterexample-trace" aria-label="反例轨迹"><span class="trace-step" data-trace="0">开始</span><span>→</span><span class="trace-step" data-trace="1">Ada 锁 schema</span><span>→</span><span class="trace-step" data-trace="2">Lin 锁 migration</span><span>→</span><span class="trace-step" data-trace="3">双方等待</span></div>
+            <div class="verdict" data-verdict><span>有界模型检查</span><strong>尚未运行</strong></div>
           </div>
-          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="TraceFix 解释">
-          <div class="metric-grid"><div class="metric"><span class="metric-label">Reported failure</span><div class="metric-value">31.1%</div><p class="metric-note">未验证协议</p></div><div class="metric"><span class="metric-label">After repair</span><div class="metric-value">14.1%</div><p class="metric-note">论文 runtime 实验</p></div></div>
-          <div class="formula">protocol → <span style="color:var(--violet);">TLA+</span> → counterexample → repair</div>
-          <div class="callout"><strong>验证协调，而不只验证输出</strong><p>死锁、活锁、重复提交与错误终止都属于协议性质。</p></div>
-          <div class="callout" style="border-color: var(--violet);"><strong>证明边界</strong><p>Model checker 只能检查被建模的状态空间与性质；自然语言语义不自动进入证明。</p></div>
+          <div class="formula">protocol → model → counterexample → repair</div>
+          <div class="callout"><strong>检查性质</strong><p>两个 Agent 最终都能取得并释放 schema.prisma 与 migration.sql 的锁。</p></div>
+          <div class="callout" style="border-color: var(--violet);"><strong>检查边界</strong><p>通过表示给定有界状态空间内未发现反例，不等同于验证自然语言任务本身。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2605.07935">阅读 TraceFix 论文 ↗</a>
         </aside>
       </div>

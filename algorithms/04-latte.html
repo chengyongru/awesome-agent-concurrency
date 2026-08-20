@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 LATTE 动态任务图、ready frontier、claim 与受控图变更。">
+  <meta name="description" content="交互演示多个 Agent 如何在支付 API 迁移任务图上 claim 已就绪节点并安全加入新任务。">
   <title>LATTE · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .dag-area { position: relative; min-block-size: 25rem; overflow: hidden; border-radius: var(--radius-md); background: oklch(0.1 0.018 264 / 0.56); box-shadow: inset 0 0 0 1px var(--line); }
+    .dag-area { position: relative; min-block-size: 25rem; overflow: hidden; border-radius: var(--radius-md); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); }
     .dag-edges { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; color: var(--line-strong); }
     .dag-edges line { stroke: currentColor; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
     .task-node { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: clamp(5rem, 12vw, 7rem); min-block-size: 4.2rem; place-content: center; padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.66rem; text-align: center; transform: translate(-50%, -50%); transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
     .task-node strong { color: var(--chalk); font-size: 0.78rem; }
-    .task-node[data-state="ready"] { border-color: var(--blue); color: var(--blue); box-shadow: 0 0 1.2rem oklch(0.75 0.145 242 / 0.15); }
-    .task-node[data-state="claimed"] { border-color: var(--yellow); color: var(--yellow); background: oklch(0.2 0.05 94 / 0.28); transform: translate(-50%, -58%); }
-    .task-node[data-state="done"] { border-color: var(--green); color: var(--green); background: oklch(0.19 0.05 148 / 0.28); }
+    .task-node[data-state="ready"] { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 1.2rem color-mix(in oklch, var(--blue) 12%, transparent); }
+    .task-node[data-state="claimed"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translate(-50%, -58%); }
+    .task-node[data-state="done"] { border-color: var(--green); color: var(--green); background: var(--green-soft); }
     .task-node[data-state="review"] { border-style: dashed; border-color: var(--violet); color: var(--violet); }
     .frontier-strip { display: flex; align-items: center; gap: 0.6rem; min-block-size: 3.2rem; margin-block-start: var(--space-3); padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.68rem; box-shadow: inset 0 0 0 1px var(--line); }
     .frontier-strip strong { color: var(--blue); }
     .worker-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: 0.55rem; }
-    .worker { min-block-size: 2.8rem; padding: 0.55rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.64); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
+    .worker { min-block-size: 2.8rem; padding: 0.55rem; border-radius: var(--radius-sm); background: var(--ink-raised); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
     .worker[data-state="busy"] { color: var(--yellow); }
     @media (max-width: 38rem) { .task-node { inline-size: 4.6rem; min-block-size: 3.7rem; } }
   </style>
@@ -30,35 +30,31 @@
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header page-shell"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span><span>Agent × Runtime</span></a><nav class="site-nav" aria-label="算法导航"><a href="03-coagent.html">CoAgent</a><a href="05-syncplan.html">下一页：SyncPlan</a></nav></header>
   <main id="main">
-    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">04 · Adaptive task graph</span><h1 class="spacer-top"><span class="accent-blue">LATTE</span></h1><p>不要让所有 Agent 盯着整个房间。动态 task DAG 只把依赖已满足的节点放入 ready frontier，空闲 Worker 只在该集合里 claim 工作。</p></div></section>
+    <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">04 · Adaptive graph</span><h1 class="spacer-top"><span class="accent-blue">LATTE</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">自己的任务 ready，才被唤醒</h2><p>推进图谱，观察 ready frontier 如何扩张与收缩；再看 Worker 提议的新任务如何先经过 Lead 审核。</p></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">支付 API 迁移任务图</h2></div>
       <div class="split">
         <div class="stage" data-demo="latte">
-          <div class="stage-topbar"><span class="stage-label">Shared adaptive graph</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>frontier = { A, B, D }</span></span></div>
           <div class="stage-canvas">
             <div class="dag-area" aria-label="动态任务依赖图">
               <svg class="dag-edges" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs><line x1="190" y1="100" x2="430" y2="175" marker-end="url(#arrow)"/><line x1="190" y1="235" x2="430" y2="185" marker-end="url(#arrow)"/><line x1="520" y1="180" x2="760" y2="130" marker-end="url(#arrow)"/><line x1="190" y1="385" x2="745" y2="365" marker-end="url(#arrow)"/><line x1="520" y1="180" x2="750" y2="365" marker-end="url(#arrow)"/></svg>
-              <span class="task-node" data-task="A" style="--x: 14%; --y: 20%;"><strong>A</strong><span>inspect API</span></span>
-              <span class="task-node" data-task="B" style="--x: 14%; --y: 47%;"><strong>B</strong><span>map schema</span></span>
-              <span class="task-node" data-task="D" style="--x: 14%; --y: 78%;"><strong>D</strong><span>draft docs</span></span>
-              <span class="task-node" data-task="C" style="--x: 48%; --y: 36%;"><strong>C</strong><span>implement</span></span>
-              <span class="task-node" data-task="E" style="--x: 82%; --y: 25%;"><strong>E</strong><span>test</span></span>
-              <span class="task-node" data-task="F" style="--x: 82%; --y: 73%;"><strong>F</strong><span>integrate</span></span>
-              <span class="task-node" data-task="G" style="--x: 61%; --y: 88%; opacity: 0;"><strong>G</strong><span>new proposal</span></span>
+              <span class="task-node" data-task="A" style="--x: 14%; --y: 20%;"><strong>检查旧 API</strong><span data-task-owner>等待 claim</span></span>
+              <span class="task-node" data-task="B" style="--x: 14%; --y: 47%;"><strong>统计调用方</strong><span data-task-owner>等待 claim</span></span>
+              <span class="task-node" data-task="D" style="--x: 14%; --y: 78%;"><strong>收集测试样本</strong><span data-task-owner>等待 claim</span></span>
+              <span class="task-node" data-task="C" style="--x: 48%; --y: 36%;"><strong>实现适配器</strong><span data-task-owner>依赖前两项</span></span>
+              <span class="task-node" data-task="E" style="--x: 82%; --y: 25%;"><strong>集成测试</strong><span data-task-owner>等待适配器</span></span>
+              <span class="task-node" data-task="F" style="--x: 82%; --y: 73%;"><strong>发布迁移说明</strong><span data-task-owner>等待适配器与样本</span></span>
+              <span class="task-node" data-task="G" style="--x: 61%; --y: 88%; opacity: 0;"><strong>兼容性检查</strong><span data-task-owner>等待 Lead 审核</span></span>
             </div>
-            <div class="frontier-strip"><span>ready frontier</span><strong data-frontier>{ A, B, D }</strong></div>
-            <div class="worker-strip"><span class="worker" data-worker="0">W₁ · idle</span><span class="worker" data-worker="1">W₂ · idle</span><span class="worker" data-worker="2">W₃ · idle</span></div>
-            <div class="phase-rail" style="--phase-count: 5;"><span class="phase">discover</span><span class="phase">claim</span><span class="phase">complete</span><span class="phase">unlock</span><span class="phase">mutate</span></div>
+            <div class="frontier-strip"><span>当前可领取</span><strong data-frontier>检查旧 API · 统计调用方 · 收集测试样本</strong></div>
+            <div class="worker-strip"><span class="worker" data-worker="0">Ada · 空闲</span><span class="worker" data-worker="1">Lin · 空闲</span><span class="worker" data-worker="2">Mira · 空闲</span></div>
           </div>
-          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div><div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div></div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="LATTE 解释">
-          <div class="metric-grid"><div class="metric"><span class="metric-label">Reported tokens</span><div class="metric-value">148K</div><p class="metric-note">论文聚合实验</p></div><div class="metric"><span class="metric-label">Leader–worker</span><div class="metric-value">379K</div><p class="metric-note">论文对照基线</p></div></div>
           <div class="formula">frontier = { t | <span class="accent-green">deps(t) ⊆ done</span> }</div>
-          <div class="callout"><strong>减少成本的关键</strong><p>不是更快处理冲突，而是不要把不相关 Agent 拉进冲突。</p></div>
-          <div class="callout" style="border-color: var(--violet);"><strong>受控变更</strong><p>Worker 可以提议新节点和依赖；影响全局结构的 mutation 由 Lead 审核。</p></div>
+          <div class="callout"><strong>调度约束</strong><p>每个节点只能被一个 Agent claim；新增节点必须通过依赖与环检查。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2605.06320">阅读 LATTE 论文 ↗</a>
         </aside>
       </div>

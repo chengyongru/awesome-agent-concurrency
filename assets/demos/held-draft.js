@@ -1,86 +1,154 @@
-import { makeStepper, qs, setPhases, setText } from '../site.js';
+import { AGENT_NAMES } from '../agents.js';
+import { makeStepper, qs, setText } from '../site.js';
 
 const root = qs('[data-demo="held-draft"]');
 const range = qs('[data-agent-range]', root);
 const output = qs('[data-agent-output]', root);
 let count = Number(range.value);
+let timeline = [];
+let renderToken = 0;
 
-const steps = [
-  { label: '所有 Agent 读取 room version v₀。', phase: 0, mode: 'read', room: 0, round: 0, held: 0, decisions: 0, headline: '所有 Agent 读取同一快照', subline: 'base_room_version = v₀' },
-  { label: '所有 Agent 并行生成数字 1 的 draft。', phase: 1, mode: 'draft', room: 0, round: 1, held: 0, decisions: 0, headline: '每个人都得出同一个答案', subline: 'draft = “1” · base = v₀' },
-  { label: 'Agent A 先提交，房间版本前进到 v₁。', phase: 2, mode: 'first', room: 1, round: 1, held: 0, decisions: 1, headline: 'A 抢先提交成功', subline: 'current_room_version = v₁' },
-  { label: '其余 draft 版本过期，全部进入 Held Draft。', phase: 2, mode: 'held', room: 1, round: 1, held: -1, decisions: -1, headline: '其余 draft 同时过期', subline: 'base v₀ ≠ current v₁' },
-  { label: 'Agent B 基于 v₁ 修订为数字 2。', phase: 3, mode: 'retry', room: 1, round: 2, held: -2, decisions: -1, headline: 'B 修订，其他 Agent 也在重判', subline: 'optimistic retry · round 2' },
-  { label: 'B 提交后，其他 draft 再次过期。', phase: 3, mode: 'second', room: 2, round: 2, held: -2, decisions: -2, headline: 'B 提交，房间再次前进', subline: 'current_room_version = v₂' },
-  { label: '最坏情况下，n 个 Agent 需要 n(n+1)/2 次判断。', phase: 3, mode: 'result', room: -1, round: -1, held: -1, decisions: -1, headline: '安全，但高竞争时昂贵', subline: 'thundering herd + coarse version' },
-];
+function buildSteps() {
+  const randomUnit = () => {
+    const value = new Uint32Array(1);
+    window.crypto.getRandomValues(value);
+    return value[0] / 2 ** 32;
+  };
+  const shuffle = (items) => {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(randomUnit() * (index + 1));
+      [result[index], result[swap]] = [result[swap], result[index]];
+    }
+    return result;
+  };
+
+  const remaining = Array.from({ length: count }, (_, index) => index);
+  const rounds = [];
+  let checksBefore = 0;
+  for (let index = 0; index < count; index += 1) {
+    const completionOrder = shuffle(remaining);
+    const attempts = completionOrder.map((agent, rank) => ({
+      agent,
+      duration: 0.55 + (rank * 0.13) + (randomUnit() * 0.07),
+    }));
+    const winner = attempts[0].agent;
+    const value = index + 1;
+    rounds.push({
+      label: `${remaining.length} 个 Agent 基于 v${index} 并发生成候选值 ${value}；最先完成者提交。`,
+      value,
+      base: index,
+      winner,
+      attempts,
+      priorWinners: rounds.map((round) => round.winner),
+      checksBefore,
+    });
+    checksBefore += remaining.length;
+    remaining.splice(remaining.indexOf(winner), 1);
+  }
+  return rounds;
+}
 
 function build() {
-  const agents = qs('[data-agents]', root);
   const messages = qs('[data-messages]', root);
-  agents.replaceChildren();
+  const room = qs('[data-room-sequence]', root);
+  root.dataset.agentDensity = count >= 7 ? 'compact' : 'normal';
+  timeline = buildSteps();
+  room.style.setProperty('--agent-count', count);
+  room.replaceChildren();
   messages.replaceChildren();
   for (let index = 0; index < count; index += 1) {
-    const name = String.fromCharCode(65 + index);
-    const agent = document.createElement('span');
-    agent.className = 'agent';
-    agent.dataset.agent = index;
-    agent.innerHTML = `<span>Agent ${name}<small data-agent-detail>${index + 1}</small></span>`;
-    agents.append(agent);
+    const name = AGENT_NAMES[index];
+    const committed = document.createElement('span');
+    committed.className = 'number-cell';
+    committed.dataset.roomNumber = index;
+    committed.innerHTML = `<strong>${index + 1}</strong><small></small>`;
+    room.append(committed);
     const message = document.createElement('div');
     message.className = 'message';
     message.dataset.message = index;
-    message.innerHTML = `<span>Agent ${name}</span><strong data-message-copy>draft “1”</strong><span class="pill" data-message-state>idle</span>`;
+    message.innerHTML = `<span>${name}</span><span class="draft-cell"><strong data-message-copy>—</strong><i class="race-track" aria-hidden="true"><i data-race-progress></i></i></span><span class="pill" data-message-state>未运行</span>`;
     messages.append(message);
   }
 }
 
+function setRoomSlot(index, owner) {
+  const slot = root.querySelector(`[data-room-number="${index}"]`);
+  slot.dataset.state = owner === undefined ? '' : 'commit';
+  qs('strong', slot).textContent = index + 1;
+  qs('small', slot).textContent = owner === undefined ? '' : AGENT_NAMES[owner];
+}
+
 function render(step) {
+  renderToken += 1;
+  const token = renderToken;
   if (!step) {
     setText('[data-status]', '等待开始', root);
-    setText('[data-headline]', '所有 Agent 读取同一快照', root);
-    setText('[data-subline]', 'base_room_version = v₀', root);
-    setText('[data-room-version]', 'v₀', root);
-    setText('[data-round]', 0, root); setText('[data-held]', 0, root); setText('[data-decisions]', 0, root);
-    root.querySelectorAll('.agent, .message').forEach((node) => { node.dataset.state = ''; });
-    root.querySelectorAll('[data-message-state]').forEach((node) => { node.textContent = 'idle'; });
-    setPhases(-1, root);
+    setText('[data-room-version]', 0, root);
+    setText('[data-round]', 0, root); setText('[data-held]', 0, root); setText('[data-version-checks]', 0, root);
+    root.querySelectorAll('.message').forEach((node) => { node.dataset.state = ''; });
+    root.querySelectorAll('[data-message-copy]').forEach((node) => { node.textContent = '—'; });
+    root.querySelectorAll('[data-message-state]').forEach((node) => { node.textContent = '未运行'; });
+    root.querySelectorAll('[data-race-progress]').forEach((node) => { node.style.animation = 'none'; });
+    root.querySelectorAll('[data-room-number]').forEach((_, index) => setRoomSlot(index));
     return;
   }
-  const total = (count * (count + 1)) / 2;
-  const held = step.mode === 'result' ? 0 : step.held === -1 ? count - 1 : step.held === -2 ? Math.max(0, count - 2) : step.held;
-  const decisions = step.mode === 'result' ? total : step.decisions === -1 ? count : step.decisions === -2 ? count + (count - 1) : step.decisions;
-  const room = step.room === -1 ? count : step.room;
-  const round = step.round === -1 ? count : step.round;
-  setText('[data-status]', step.mode === 'result' ? '退化完成' : `room v${room}`, root);
-  setText('[data-headline]', step.headline, root); setText('[data-subline]', step.subline, root);
-  setText('[data-room-version]', `v${room}`, root); setText('[data-round]', round, root); setText('[data-held]', held, root); setText('[data-decisions]', decisions, root);
-  setPhases(step.phase, root);
-  root.querySelectorAll('[data-agent]').forEach((agent, index) => {
-    let state = '';
-    if (step.mode === 'read' || step.mode === 'draft') state = 'thinking';
-    if (step.mode === 'first') state = index === 0 ? 'committed' : 'thinking';
-    if (step.mode === 'held') state = index === 0 ? 'committed' : 'conflict';
-    if (step.mode === 'retry') state = index === 0 ? 'committed' : index === 1 ? 'thinking' : 'conflict';
-    if (step.mode === 'second') state = index < 2 ? 'committed' : 'conflict';
-    if (step.mode === 'result') state = 'committed';
-    agent.dataset.state = state;
-  });
+
+  const priorByAgent = new Map(step.priorWinners.map((agent, index) => [agent, index]));
+  const attemptByAgent = new Map(step.attempts.map((attempt) => [attempt.agent, attempt]));
+  step.priorWinners.forEach((owner, index) => setRoomSlot(index, owner));
+  for (let index = step.priorWinners.length; index < count; index += 1) setRoomSlot(index);
+  setText('[data-status]', `room v${step.base}`, root);
+  setText('[data-room-version]', step.base, root);
+  setText('[data-round]', step.base, root);
+  setText('[data-held]', 0, root);
+  setText('[data-version-checks]', step.checksBefore, root);
+
+  let finished = 0;
+  let held = 0;
   root.querySelectorAll('[data-message]').forEach((message, index) => {
     const badge = qs('[data-message-state]', message);
     const copy = qs('[data-message-copy]', message);
-    let state = '';
-    let text = 'draft';
-    let body = 'draft “1”';
-    if (step.mode === 'draft') { state = ''; text = 'base v₀'; }
-    if (step.mode === 'first') { state = index === 0 ? 'commit' : ''; text = index === 0 ? 'commit' : 'checking'; }
-    if (step.mode === 'held') { state = index === 0 ? 'commit' : 'held'; text = index === 0 ? 'commit' : 'held'; }
-    if (step.mode === 'retry') { state = index === 0 ? 'commit' : index === 1 ? '' : 'held'; text = index === 0 ? 'commit' : index === 1 ? 'base v₁' : 'held'; body = index === 1 ? 'draft “2”' : body; }
-    if (step.mode === 'second') { state = index < 2 ? 'commit' : 'held'; text = index < 2 ? 'commit' : 'held again'; body = index === 1 ? 'draft “2”' : body; }
-    if (step.mode === 'result') { state = 'commit'; text = 'commit'; body = `draft “${index + 1}”`; }
-    message.dataset.state = state; badge.textContent = text; copy.textContent = body;
+    const progress = qs('[data-race-progress]', message);
+    const committedAt = priorByAgent.get(index);
+    if (committedAt !== undefined) {
+      const pastAttempt = timeline[committedAt].attempts.find((attempt) => attempt.agent === index);
+      message.dataset.state = 'commit';
+      copy.textContent = `提交 ${committedAt + 1} · ${pastAttempt.duration.toFixed(2)}s`;
+      badge.textContent = `占用 #${committedAt + 1}`;
+      progress.style.animation = 'none';
+      return;
+    }
+
+    const attempt = attemptByAgent.get(index);
+    message.dataset.state = 'racing';
+    copy.textContent = `候选 ${step.value} · base v${step.base}`;
+    badge.textContent = `${attempt.duration.toFixed(2)}s`;
+    progress.style.setProperty('--race-duration', `${attempt.duration}s`);
+    progress.style.animation = 'none';
+    void progress.offsetWidth;
+    progress.style.animation = '';
+    progress.addEventListener('animationend', () => {
+      if (token !== renderToken) return;
+      finished += 1;
+      setText('[data-version-checks]', step.checksBefore + finished, root);
+      if (index === step.winner) {
+        message.dataset.state = 'commit';
+        copy.textContent = `提交 ${step.value} · ${attempt.duration.toFixed(2)}s`;
+        badge.textContent = `占用 #${step.value}`;
+        setRoomSlot(step.value - 1, index);
+        setText('[data-room-version]', step.value, root);
+        setText('[data-round]', step.value, root);
+        setText('[data-status]', step.value === count ? '运行完成' : `room v${step.value}`, root);
+      } else {
+        held += 1;
+        message.dataset.state = 'held';
+        badge.textContent = 'held';
+        setText('[data-held]', held, root);
+      }
+    }, { once: true });
   });
 }
 
-const demo = makeStepper({ root, steps, render, onReset: build, delay: 1050 });
+const demo = makeStepper({ root, steps: () => timeline, render, onReset: build, delay: 1800 });
 range.addEventListener('input', () => { count = Number(range.value); output.value = count; output.textContent = count; demo.reset(); });

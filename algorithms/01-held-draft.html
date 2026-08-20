@@ -3,20 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示 Held Draft 的房间版本检查与高竞争 O(n²) 退化。">
+  <meta name="description" content="交互演示 Held Draft 在并发报数中的版本检查、held 与 revise 状态。">
   <title>Held Draft · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero { padding-block-end: var(--space-5); }
     .algorithm-hero h1 { max-inline-size: 12ch; font-size: clamp(2.8rem, 8vw, 6rem); }
-    .room-state { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; margin-block-end: var(--space-4); }
-    .version-orbit { position: relative; display: grid; inline-size: 5.4rem; aspect-ratio: 1; place-items: center; border: 1px solid var(--blue); border-radius: 50%; color: var(--blue); font-family: var(--mono); box-shadow: 0 0 2rem oklch(0.75 0.145 242 / 0.15); }
-    .version-orbit::after { content: "room"; position: absolute; inset-block-end: -0.8rem; padding-inline: 0.35rem; background: var(--ink-raised); color: var(--faint); font-size: 0.58rem; text-transform: uppercase; }
-    .room-copy strong { display: block; font-family: var(--display); font-size: 1.45rem; }
-    .room-copy small { color: var(--muted); font-family: var(--mono); }
+    .counting-board { display: grid; gap: 0.65rem; margin-block-end: var(--space-3); }
+    .counting-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; align-items: center; gap: 0.8rem; }
+    .counting-label { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+    .number-sequence { display: grid; grid-template-columns: repeat(var(--agent-count, 4), minmax(2.2rem, 1fr)); gap: 0.35rem; }
+    .number-cell { position: relative; isolation: isolate; display: grid; min-block-size: 2.6rem; place-items: center; overflow: hidden; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--faint); font-family: var(--mono); font-size: 0.72rem; }
+    .number-cell::before { content: ""; position: absolute; z-index: -1; inset: 50% auto auto 50%; inline-size: 170%; aspect-ratio: 1; border-radius: 50%; background: var(--accent-soft); opacity: 0; transform: translate(-50%, -50%) scale(0); }
+    .number-cell > * { position: relative; z-index: 1; }
+    .number-cell strong { align-self: end; font-weight: 600; }
+    .number-cell small { align-self: start; font-size: 0.52rem; }
+    .room-sequence .number-cell { border-style: dashed; }
+    .room-sequence .number-cell[data-state="commit"] { color: var(--accent); }
+    .room-sequence .number-cell[data-state="commit"]::before { animation: paint-bucket-fill 420ms cubic-bezier(0.2, 0, 0, 1) forwards; }
+    @keyframes paint-bucket-fill { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+    .room-version { display: inline-flex; align-items: baseline; gap: 0.35rem; color: var(--faint); font-family: var(--mono); font-size: 0.64rem; white-space: nowrap; }
+    .room-version strong { color: var(--accent); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+    .message-header { display: grid; grid-template-columns: 7.8rem minmax(0, 1fr) auto; gap: var(--space-2); padding-inline: 0.9rem; color: var(--faint); font-family: var(--mono); font-size: 0.62rem; }
+    .message-lane .message { grid-template-columns: 7.8rem minmax(0, 1fr) auto; }
+    .draft-cell { display: grid; grid-template-columns: minmax(10rem, auto) minmax(5rem, 12rem); align-items: center; gap: 0.8rem; }
+    .race-track { display: block; block-size: 2px; overflow: hidden; background: var(--line-strong); opacity: 0; }
+    .race-track > i { display: block; inline-size: 100%; block-size: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+    .message[data-state="racing"] { color: var(--accent); }
+    .message[data-state="racing"] .race-track { opacity: 1; }
+    .message[data-state="racing"] [data-race-progress] { animation: held-race-progress var(--race-duration) linear forwards; }
+    @keyframes held-race-progress { to { transform: scaleX(1); } }
     .held-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: var(--space-3); }
-    .held-summary div { padding: 0.65rem; border-radius: var(--radius-sm); background: oklch(0.1 0.018 264 / 0.68); text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
+    .held-summary div { padding: 0.65rem; border-block-start: 1px solid var(--line); text-align: center; }
     .held-summary strong { display: block; color: var(--yellow); font-family: var(--display); font-size: 1.55rem; font-variant-numeric: tabular-nums; }
     .held-summary span { color: var(--faint); font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; }
   </style>
@@ -30,53 +49,44 @@
   <main id="main">
     <section class="hero algorithm-hero page-shell">
       <div class="hero-copy">
-        <span class="eyebrow">01 · Global optimistic concurrency</span>
+        <span class="eyebrow">01 · Global OCC</span>
         <h1 class="spacer-top">Held <span class="accent-red">Draft</span></h1>
-        <p>一个优秀的 stale-action 安全阀，也是一种会在高竞争下形成三角形成本的调度方法。让所有 Agent 同时读 v₀，然后亲手制造冲突。</p>
       </div>
     </section>
 
     <section class="section page-shell" aria-labelledby="demo-title">
       <div class="section-heading">
         <span class="eyebrow">Live protocol</span>
-        <h2 id="demo-title">房间变了，所以全部重判</h2>
-        <p>每个 draft 都绑定生成时看到的 room version。提交时版本不同，就被 hold，并交还给 Agent 决定。</p>
+        <h2 id="demo-title">房间版本验证</h2>
       </div>
       <div class="split">
         <div class="stage" data-demo="held-draft">
-          <div class="stage-topbar"><span class="stage-label">Room / count-to-n</span><span class="stage-status"><i class="status-dot" aria-hidden="true"></i><span data-status>等待开始</span></span></div>
           <div class="stage-canvas">
-            <div class="room-state">
-              <div class="room-copy"><strong data-headline>所有 Agent 读取同一快照</strong><small data-subline>base_room_version = v₀</small></div>
-              <div class="version-orbit"><span data-room-version>v₀</span></div>
+            <div class="counting-board" aria-label="房间报数序列">
+              <div class="counting-row"><span class="counting-label">房间序列</span><div class="number-sequence room-sequence" data-room-sequence></div><span class="room-version"><span>房间版本</span><strong data-room-version>0</strong></span></div>
             </div>
-            <div class="agent-row" data-agents aria-label="Agent 状态"></div>
+            <div class="message-header" aria-hidden="true"><span>Agent</span><span>当前 draft</span><span>耗时 / 状态</span></div>
             <div class="message-lane" data-messages aria-label="Draft 提交状态"></div>
             <div class="held-summary" aria-label="运行指标">
-              <div><strong data-round>0</strong><span>round</span></div>
-              <div><strong data-held>0</strong><span>held</span></div>
-              <div><strong data-decisions>0</strong><span>decisions</span></div>
-            </div>
-            <div class="phase-rail" style="--phase-count: 4;">
-              <span class="phase">read v₀</span><span class="phase">draft</span><span class="phase">validate</span><span class="phase">retry</span>
+              <div><strong data-round>0</strong><span>已提交</span></div>
+              <div><strong data-held>0</strong><span>待重算</span></div>
+              <div><strong data-version-checks>0</strong><span>版本校验次数</span></div>
             </div>
           </div>
           <div class="stage-controls">
             <div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div>
-            <label class="range-wrap">Agent 数量：<output data-agent-output>4</output><input type="range" min="3" max="8" value="4" data-agent-range></label>
-            <div class="progress-group" aria-hidden="true"><div class="progress-track"><span class="progress-fill"></span></div><span class="step-count">00 / 07</span></div>
+            <label class="range-wrap"><span>Agent 数量：<output data-agent-output>4</output></span><input type="range" min="3" max="8" value="4" data-agent-range></label>
           </div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
 
         <aside class="narrative" aria-label="Held Draft 解释">
           <div class="metric-grid">
-            <div class="metric"><span class="metric-label">Worst case</span><div class="metric-value">O(n²)</div><p class="metric-note">高竞争退化</p></div>
+            <div class="metric"><span class="metric-label">This trace</span><div class="metric-value">n(n+1)/2</div><p class="metric-note">同步 revise 后的发送检查</p></div>
             <div class="metric"><span class="metric-label">Protects</span><div class="metric-value">msg</div><p class="metric-note">消息提交边界</p></div>
           </div>
           <div class="formula"><span class="accent-yellow">n + (n−1) + … + 1</span> = n(n+1)/2</div>
-          <div class="callout"><strong>它解决什么</strong><p>基于旧世界生成的消息，不应盲目进入新世界。</p></div>
-          <div class="callout" style="border-color: var(--red);"><strong>它没有解决什么</strong><p>ownership、细粒度依赖，以及消息之外已经发生的工具副作用。</p></div>
+          <div class="callout" style="border-color: var(--red);"><strong>演示分支</strong><p>本例的 held draft 全部选择 revise；系统也允许原样重发、静默或显式 override。</p></div>
           <a class="source-link" href="https://raft.build/resources/blog/is-having-agents-in-the-room-meant-to-be-chaotic/">阅读 Raft 的 Held Draft 说明 ↗</a>
         </aside>
       </div>
