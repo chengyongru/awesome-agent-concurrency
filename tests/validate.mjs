@@ -144,24 +144,95 @@ if (!/class="coagent-scene"/.test(redesignedDemos.coagent.html) || !/data-edge="
   || !/要求.*重做/.test(redesignedDemos.coagent.js) || !/不接收通知/.test(redesignedDemos.coagent.js) || !/migration\.md 保留/.test(redesignedDemos.coagent.js)) {
   errors.push('CoAgent must derive selective repair from runtime-recorded tool footprints instead of a predeclared task dependency');
 }
-if (!/data-task-owner/.test(redesignedDemos.latte.html) || !/兼容性检查/.test(redesignedDemos.latte.html) || !/审核通过 · 等待 claim/.test(redesignedDemos.latte.js)) {
+if (!/class="latte-scene"/.test(redesignedDemos.latte.html) || (redesignedDemos.latte.html.match(/class="dynamic-edge"/g) ?? []).length !== 8
+  || !/data-path="discover-trunk"/.test(redesignedDemos.latte.html) || !/data-path="merge-report"/.test(redesignedDemos.latte.html)
+  || (redesignedDemos.latte.html.match(/class="claim-edge"/g) ?? []).length !== 5
+  || (redesignedDemos.latte.html.match(/<i data-task-progress/g) ?? []).length !== 5
+  || !/data-path="claim-seed"/.test(redesignedDemos.latte.html) || !/data-path="claim-report"/.test(redesignedDemos.latte.html)
+  || !/data-task="seed"/.test(redesignedDemos.latte.html) || !/data-task="report"/.test(redesignedDemos.latte.html) || !/data-lead/.test(redesignedDemos.latte.html)
+  || /dag-area|frontier-strip|worker-strip/.test(redesignedDemos.latte.html)
+  || !/data-task-owner/.test(redesignedDemos.latte.html) || !/budget\.xlsx/.test(redesignedDemos.latte.html)
+  || !/阅读本周资料/.test(redesignedDemos.latte.html) || !/生成项目周报/.test(redesignedDemos.latte.html)
+  || !/连续调用 Discover/.test(redesignedDemos.latte.js) || !/保持无环/.test(redesignedDemos.latte.js)
+  || !/三项办公任务同时进入 frontier/.test(redesignedDemos.latte.js) || !/claim 已解锁的周报节点/.test(redesignedDemos.latte.js)
+  || !/setPath\('claim-seed', 'active'\)/.test(redesignedDemos.latte.js)
+  || !/function runParallelAnalyses\(token\)/.test(redesignedDemos.latte.js)
+  || !/analyses\.forEach\(\(\{ id, worker, agent, task, path, claim \}\) =>/.test(redesignedDemos.latte.js)
+  || !/setPath\(claim, 'active'\)/.test(redesignedDemos.latte.js)
+  || !/remaining = new Set/.test(redesignedDemos.latte.js) || !/if \(waiting\.length\)/.test(redesignedDemos.latte.js)
+  || !/crypto\.getRandomValues/.test(redesignedDemos.latte.js) || !/animationend/.test(redesignedDemos.latte.js)
+  || /mode: '(?:budget|schedule|risk)-claim'/.test(redesignedDemos.latte.js)
+  || !/setPath\('claim-report', 'active'\)/.test(redesignedDemos.latte.js)) {
   errors.push('LATTE must expose task ownership and review a dynamically proposed graph node before scheduling it');
 }
-if (!/data-gate-state/.test(redesignedDemos.syncplan.html) || !/data-barrier-state/.test(redesignedDemos.syncplan.html) || !/检测到等待环/.test(redesignedDemos.syncplan.js)) {
+if (!/class="sync-scene"/.test(redesignedDemos.syncplan.html)
+  || (redesignedDemos.syncplan.html.match(/<i data-sync-progress/g) ?? []).length !== 5
+  || !/data-sync-path="wait-image"/.test(redesignedDemos.syncplan.html)
+  || !/data-sync-path="test-barrier"/.test(redesignedDemos.syncplan.html)
+  || !/data-sync-path="policy-barrier"/.test(redesignedDemos.syncplan.html)
+  || !/data-sync-path="detector-impact"/.test(redesignedDemos.syncplan.html)
+  || !/data-sync-path="deadlock-a-b"/.test(redesignedDemos.syncplan.html)
+  || !/data-sync-path="deadlock-b-a"/.test(redesignedDemos.syncplan.html)
+  || /timeline-board|runtime-primitives|action-block/.test(redesignedDemos.syncplan.html)
+  || !/Wait_agents/.test(redesignedDemos.syncplan.js)
+  || !/crypto\.getRandomValues/.test(redesignedDemos.syncplan.js) || !/animationend/.test(redesignedDemos.syncplan.js)
+  || !/setPath\('wait-image', 'active'\)/.test(redesignedDemos.syncplan.js)
+  || !/setPath\('detector-impact', 'stale'\)/.test(redesignedDemos.syncplan.js)
+  || !/setPath\('deadlock-a-b', 'deadlock'\)/.test(redesignedDemos.syncplan.js)
+  || !/检测到等待环/.test(redesignedDemos.syncplan.js)) {
   errors.push('SyncPlan must expose its synchronization conditions and reject a cyclic wait plan');
 }
-if (!/冲突前序已结算/.test(redesignedDemos.atomix.html) || !/支付意图已取消/.test(redesignedDemos.atomix.js) || !/邮件未发送/.test(redesignedDemos.atomix.js)) {
+if (!/class="atomix-scene"/.test(redesignedDemos.atomix.html)
+  || (redesignedDemos.atomix.html.match(/<i data-atomix-progress/g) ?? []).length !== 4
+  || !/data-atomix-effect="draft"/.test(redesignedDemos.atomix.html)
+  || !/data-atomix-effect="hotel"/.test(redesignedDemos.atomix.html)
+  || !/data-atomix-effect="payment"/.test(redesignedDemos.atomix.html)
+  || !/data-atomix-effect="email"/.test(redesignedDemos.atomix.html)
+  || (redesignedDemos.atomix.html.match(/data-resource-frontier=/g) ?? []).length !== 2
+  || !/data-atomix-path="compensate-hotel"/.test(redesignedDemos.atomix.html)
+  || !/data-atomix-path="compensate-payment"/.test(redesignedDemos.atomix.html)
+  || /transaction-flow|effect-stack|class="frontier"/.test(redesignedDemos.atomix.html)
+  || !/crypto\.getRandomValues/.test(redesignedDemos.atomix.js) || !/animationend/.test(redesignedDemos.atomix.js)
+  || !/调用未执行 · 已缓冲/.test(redesignedDemos.atomix.js)
+  || !/已预留 · 可取消/.test(redesignedDemos.atomix.js)
+  || !/支付意图已取消/.test(redesignedDemos.atomix.js)
+  || !/邮件未发送/.test(redesignedDemos.atomix.js)) {
   errors.push('Atomix must settle one coherent travel transaction and gate irreversible notification until commit');
 }
-if (!/data-observation/.test(redesignedDemos.cordon.html) || !/队列 180/.test(redesignedDemos.cordon.js) || !/未执行扩容/.test(redesignedDemos.cordon.js)) {
+if (!/class="cordon-scene"/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-node="ticket"/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-node="order"/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-node="decision"/.test(redesignedDemos.cordon.html)
+  || !/shadow state/.test(redesignedDemos.cordon.html) || !/effect outbox/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-check="lineage"/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-check="authority"/.test(redesignedDemos.cordon.html)
+  || !/data-cordon-check="current"/.test(redesignedDemos.cordon.html)
+  || /class="lineage"|validation-grid|settlement-banner/.test(redesignedDemos.cordon.html)
+  || !/crypto\.getRandomValues/.test(redesignedDemos.cordon.js) || !/animationend/.test(redesignedDemos.cordon.js)
+  || !/订单 #482 已退款/.test(redesignedDemos.cordon.js)
+  || !/shadow state 已丢弃/.test(redesignedDemos.cordon.js)
+  || !/outbox 已取消 · 未退款/.test(redesignedDemos.cordon.js)
+  || !/未执行重复退款/.test(redesignedDemos.cordon.js)) {
   errors.push('Cordon must revalidate live evidence and block a stale authorized action');
 }
-if (!/lock schema\.prisma[\s\S]*lock migration\.sql[\s\S]*lock migration\.sql[\s\S]*lock schema\.prisma/.test(redesignedDemos.tracefix.html)
-  || !/lock schema\.prisma[\s\S]*lock migration\.sql/.test(redesignedDemos.tracefix.js)
-  || !/有界状态空间内未发现死锁/.test(redesignedDemos.tracefix.js)) {
+if (!/class="trace-scene"/.test(redesignedDemos.tracefix.html)
+  || (redesignedDemos.tracefix.html.match(/<i data-trace-progress/g) ?? []).length !== 2
+  || !/data-trace-path="ada-schema"/.test(redesignedDemos.tracefix.html)
+  || !/data-trace-path="lin-migration"/.test(redesignedDemos.tracefix.html)
+  || !/data-trace-path="ada-wait-migration"/.test(redesignedDemos.tracefix.html)
+  || !/data-trace-path="lin-wait-schema"/.test(redesignedDemos.tracefix.html)
+  || !/data-trace-path="lock-order"/.test(redesignedDemos.tracefix.html)
+  || /code-panel|model-space|counterexample-trace/.test(redesignedDemos.tracefix.html)
+  || !/crypto\.getRandomValues/.test(redesignedDemos.tracefix.js) || !/animationend/.test(redesignedDemos.tracefix.js)
+  || !/PlusCal/.test(redesignedDemos.tracefix.js) || !/TLA\+/.test(redesignedDemos.tracefix.js)
+  || !/setPath\('ada-wait-migration', 'wait'\)/.test(redesignedDemos.tracefix.js)
+  || !/setPath\('lin-wait-schema', 'wait'\)/.test(redesignedDemos.tracefix.js)
+  || !/schema\.prisma → migration\.sql/.test(redesignedDemos.tracefix.js)
+  || !/有界状态空间内未发现死锁/.test(redesignedDemos.tracefix.js)
+  || !/Runtime Monitor/.test(redesignedDemos.tracefix.js)) {
   errors.push('TraceFix must show the conflicting file-lock order, repair it, and state the bounded verification result precisely');
 }
-const scenarioTitles = ['局部依赖修复', '动态任务图调度', '服务发布同步', '差旅副作用结算', '扩容授权检查', '共享文件锁验证'];
+const scenarioTitles = ['局部依赖修复', '项目周报整理', '服务发布同步', '差旅副作用结算', '客服退款提交', '共享文件锁验证'];
 if (!scenarioTitles.every((title) => indexHtml.includes(`<h2>${title}</h2>`))) {
   errors.push('index.html: redesigned canvas nodes must use concrete scenario titles');
 }

@@ -493,202 +493,50 @@
 .canvas-page [data-canvas-node="coagent"] .conflict-engine[data-state="compare"] { background-color: var(--red-soft); }
 .canvas-page [data-canvas-node="coagent"] .stage-controls { min-block-size: 4.2rem; padding-block: 0.35rem; }
 
-/* LATTE — the graph itself is the surface; node state carries the hierarchy. */
-.canvas-page [data-canvas-node="latte"] .stage-canvas { padding-block: 0.9rem 0.25rem; }
-.canvas-page [data-canvas-node="latte"] .dag-area {
-  min-block-size: 22rem;
-  overflow: visible;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="latte"] .dag-edges { color: var(--demo-rule); }
-.canvas-page [data-canvas-node="latte"] .task-node {
-  inline-size: 6.6rem;
-  min-block-size: 4.4rem;
-  border-color: var(--demo-rule);
-  border-radius: 0.35rem;
-  background: var(--demo-paper);
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="latte"] .task-node strong { color: currentColor; font-size: 0.9rem; }
-.canvas-page [data-canvas-node="latte"] .task-node[data-state="ready"] { border-color: var(--accent); background: var(--demo-paper); color: var(--accent); box-shadow: none; }
-.canvas-page [data-canvas-node="latte"] .task-node[data-state="claimed"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -58%); }
-.canvas-page [data-canvas-node="latte"] .task-node[data-state="done"] { border-color: var(--accent); background: var(--accent); color: var(--demo-paper); }
-.canvas-page [data-canvas-node="latte"] .task-node[data-state="review"] { border-style: solid; border-color: var(--accent); color: var(--accent); outline: 2px solid var(--accent-soft); outline-offset: 3px; }
-.canvas-page [data-canvas-node="latte"] .frontier-strip {
-  min-block-size: 2.9rem;
-  margin-block-start: 0.85rem;
-  padding: 0.55rem 0;
-  border-block: 1px solid var(--demo-rule);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="latte"] .frontier-strip strong { color: var(--accent); }
-.canvas-page [data-canvas-node="latte"] .worker-strip { gap: 1rem; }
-.canvas-page [data-canvas-node="latte"] .worker {
-  padding: 0.6rem 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="latte"] .worker[data-state="busy"] { border-color: var(--accent); color: var(--accent); }
+/* LATTE — an orthogonal graph grows without crossing the separate Worker lane. */
+.canvas-page [data-canvas-node="latte"] .stage-canvas { padding-block: 0.15rem 0; }
+.canvas-page [data-canvas-node="latte"] .latte-scene { min-block-size: 29.5rem; }
+.canvas-page [data-canvas-node="latte"] .task-node { background-color: var(--demo-paper); }
+.canvas-page [data-canvas-node="latte"] .task-node { border-color: var(--demo-rule); box-shadow: none; }
+.canvas-page [data-canvas-node="latte"] .task-node[data-state="ready"] { border-color: var(--accent); background-color: var(--demo-paper); box-shadow: 0 0 0 0.25rem var(--accent-soft); }
+.canvas-page [data-canvas-node="latte"] .task-node[data-state="claimed"] { background-color: var(--accent-soft); }
+.canvas-page [data-canvas-node="latte"] .task-node[data-state="done"] { background-color: var(--accent); color: var(--demo-paper); }
+.canvas-page [data-canvas-node="latte"] .task-node[data-state="review"] { background-color: var(--blue-soft); }
+.canvas-page [data-canvas-node="latte"] .stage-controls { min-block-size: 4.2rem; padding-block: 0.35rem; }
 
-/* SyncPlan — a timing diagram, not a stack of cards. */
-.canvas-page [data-canvas-node="syncplan"] .timeline-board { gap: 0.85rem; }
-.canvas-page [data-canvas-node="syncplan"] .lane-track {
-  gap: 0.4rem;
-  min-block-size: 4.35rem;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="syncplan"] .action-block {
-  border: 1px solid var(--demo-rule);
-  border-radius: 0.25rem;
-  background: var(--demo-paper);
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="syncplan"] .action-block[data-state="active"] { border-color: var(--accent); background: var(--accent); color: var(--demo-paper); }
-.canvas-page [data-canvas-node="syncplan"] .action-block[data-state="done"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.canvas-page [data-canvas-node="syncplan"] .action-block[data-state="wait"] {
-  border-color: var(--accent);
-  background: repeating-linear-gradient(-45deg, var(--accent-soft) 0 0.35rem, var(--demo-paper) 0.35rem 0.7rem);
-  color: var(--accent);
-}
-.canvas-page [data-canvas-node="syncplan"] .action-block[data-state="stale"],
-.canvas-page [data-canvas-node="syncplan"] .action-block[data-state="deadlock"] { border-color: var(--red); background: var(--red-soft); color: var(--red); box-shadow: none; }
-.canvas-page [data-canvas-node="syncplan"] .runtime-primitives { gap: 1.2rem; margin-block-start: 1.25rem; }
-.canvas-page [data-canvas-node="syncplan"] .primitive {
-  min-block-size: 3.7rem;
-  padding-block-start: 0.5rem;
-  border-block-start: 1px solid var(--demo-rule);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="syncplan"] .primitive[data-state="active"] { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 2px var(--accent); }
+/* Later protocols — one spatial scene per algorithm, drawn directly on the shared grid. */
+.canvas-page :is(
+  [data-canvas-node="syncplan"],
+  [data-canvas-node="atomix"],
+  [data-canvas-node="cordon"],
+  [data-canvas-node="tracefix"]
+) .stage-canvas { padding-block: 0.15rem 0; }
 
-/* Atomix — phase rail plus a flat effect ledger. */
-.canvas-page [data-canvas-node="atomix"] .transaction-flow { gap: 0.65rem; margin-block-end: 1rem; }
-.canvas-page [data-canvas-node="atomix"] .tx-node {
-  min-block-size: 4rem;
-  border-color: var(--demo-rule);
-  border-radius: 0.35rem;
-  background: var(--demo-paper);
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="atomix"] .tx-node[data-state="active"] { border-color: var(--accent); background: var(--accent); color: var(--demo-paper); box-shadow: none; }
-.canvas-page [data-canvas-node="atomix"] .tx-node[data-state="done"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.canvas-page [data-canvas-node="atomix"] .effect-stack { gap: 0; }
-.canvas-page [data-canvas-node="atomix"] .effect {
-  min-block-size: 4.15rem;
-  padding: 0.65rem 0.35rem;
-  border-block-start: 1px solid var(--demo-rule);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="atomix"] .effect:last-child { border-block-end: 1px solid var(--demo-rule); }
-.canvas-page [data-canvas-node="atomix"] .effect-class { color: var(--accent); font-weight: 650; }
-.canvas-page [data-canvas-node="atomix"] .effect[data-effect="email"] .effect-class { color: var(--red); }
-.canvas-page [data-canvas-node="atomix"] .effect[data-state="staged"] { box-shadow: inset 3px 0 var(--accent); }
-.canvas-page [data-canvas-node="atomix"] .effect[data-state="released"] { background: var(--accent-soft); }
-.canvas-page [data-canvas-node="atomix"] .effect[data-state="compensated"] { background: var(--demo-wash); box-shadow: inset 3px 0 var(--accent); }
-.canvas-page [data-canvas-node="atomix"] .effect[data-state="blocked"] { background: var(--red-soft); box-shadow: inset 3px 0 var(--red); }
-.canvas-page [data-canvas-node="atomix"] .frontier-track { block-size: 2px; border-radius: 0; background: var(--demo-rule); }
-.canvas-page [data-canvas-node="atomix"] .frontier-fill { background: var(--accent); }
+.canvas-page :is(.sync-scene, .atomix-scene, .cordon-scene, .trace-scene) { min-block-size: 29.5rem; }
 
-/* Cordon — lineage is primary; validation and settlement are supporting rows. */
-.canvas-page [data-canvas-node="cordon"] .lineage { gap: 1.25rem; margin-block: 1rem 1.25rem; }
-.canvas-page [data-canvas-node="cordon"] .lineage-node {
-  min-block-size: 7.6rem;
+.canvas-page :is(.sync-node, .atomix-task, .cordon-node, .trace-node) {
   border-color: var(--demo-rule);
-  border-radius: 0.4rem;
-  background: var(--demo-paper);
+  background-color: var(--demo-paper);
   box-shadow: none;
 }
-.canvas-page [data-canvas-node="cordon"] .lineage-node[data-state="active"] { border-color: var(--accent); background: var(--accent); color: var(--demo-paper); }
-.canvas-page [data-canvas-node="cordon"] .lineage-node[data-state="active"] strong { color: var(--demo-paper); }
-.canvas-page [data-canvas-node="cordon"] .lineage-node[data-state="valid"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.canvas-page [data-canvas-node="cordon"] .validation-grid { gap: 1rem; }
-.canvas-page [data-canvas-node="cordon"] .validation {
-  min-block-size: 4.8rem;
-  padding: 0.55rem 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="cordon"] .validation[data-state="checking"] { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 2px var(--accent); }
-.canvas-page [data-canvas-node="cordon"] .validation[data-state="valid"] { border-color: var(--accent); color: var(--accent); box-shadow: none; }
-.canvas-page [data-canvas-node="cordon"] .validation[data-state="invalid"] { border-color: var(--red); color: var(--red); box-shadow: none; }
-.canvas-page [data-canvas-node="cordon"] .settlement-banner {
-  min-block-size: 3.4rem;
-  border: 0;
-  border-radius: 0.3rem;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="cordon"] .settlement-banner[data-state="commit"] { border-color: var(--accent); background: var(--accent); color: var(--demo-paper); box-shadow: none; }
-.canvas-page [data-canvas-node="cordon"] .settlement-banner[data-state="abort"] { border-color: var(--red); background: var(--red-soft); color: var(--red); box-shadow: none; }
 
-/* TraceFix — code and state graph stay separate without enclosing panels. */
-.canvas-page [data-canvas-node="tracefix"] .trace-layout { gap: 2rem; }
-.canvas-page [data-canvas-node="tracefix"] .protocol-panel {
-  min-block-size: 16.5rem;
-  padding: 0.8rem 1rem;
-  border-inline-start: 2px solid var(--accent);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .model-space {
-  min-block-size: 16.5rem;
-  overflow: visible;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .state-node {
-  inline-size: 5rem;
-  min-block-size: 3.2rem;
-  border-color: var(--demo-rule);
-  border-radius: 0.35rem;
-  background: var(--demo-paper);
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .state-node[data-state="visited"] { border-color: var(--accent); color: var(--accent); }
-.canvas-page [data-canvas-node="tracefix"] .state-node[data-state="safe"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.canvas-page [data-canvas-node="tracefix"] .state-node[data-state="counterexample"] { border-color: var(--red); background: var(--red-soft); color: var(--red); box-shadow: none; transform: translate(-50%, -50%) scale(1.06); }
-.canvas-page [data-canvas-node="tracefix"] .counterexample-trace {
-  min-block-size: 3.8rem;
-  margin-block-start: 1rem;
-  padding: 0.55rem 0;
-  border-block: 1px solid var(--demo-rule);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .trace-step {
-  border: 1px solid var(--demo-rule);
-  border-radius: 0.25rem;
-  background: var(--demo-paper);
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .verdict {
-  min-block-size: 3.4rem;
-  padding: 0.55rem 0.8rem;
-  border-inline-start: 3px solid var(--demo-rule);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.canvas-page [data-canvas-node="tracefix"] .verdict[data-state="fail"] { border-color: var(--red); background: var(--red-soft); }
-.canvas-page [data-canvas-node="tracefix"] .verdict[data-state="pass"] { border-color: var(--accent); background: var(--accent-soft); }
+.canvas-page :is(
+  .sync-node[data-state="done"],
+  .atomix-task[data-state="done"],
+  .cordon-node[data-state="done"],
+  .cordon-node[data-state="commit"],
+  .trace-node[data-state="owned"],
+  .trace-node[data-state="enforce"]
+) { background-color: var(--accent); color: var(--demo-paper); }
+
+.canvas-page :is(.atomix-effect, .atomix-sink, .cordon-check, .trace-property) { border-color: var(--demo-rule); }
+
+.canvas-page :is(
+  [data-canvas-node="syncplan"],
+  [data-canvas-node="atomix"],
+  [data-canvas-node="cordon"],
+  [data-canvas-node="tracefix"]
+) .stage-controls { min-block-size: 4.2rem; padding-block: 0.35rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .node-visual * { animation: none !important; }

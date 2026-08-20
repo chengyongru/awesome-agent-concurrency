@@ -9,23 +9,40 @@
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .trace-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
-    .protocol-panel { min-block-size: 17rem; }
-    .model-space { position: relative; min-block-size: 17rem; overflow: hidden; border-radius: var(--radius-md); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); }
-    .state-node { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: 4.8rem; min-block-size: 3.1rem; place-content: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.57rem; text-align: center; transform: translate(-50%, -50%); transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
-    .state-node[data-state="visited"] { border-color: var(--blue); color: var(--blue); }
-    .state-node[data-state="counterexample"] { border-color: var(--red); color: var(--red); background: var(--red-soft); box-shadow: 0 0 1.2rem color-mix(in oklch, var(--red) 14%, transparent); }
-    .state-node[data-state="safe"] { border-color: var(--green); color: var(--green); background: var(--green-soft); }
-    .state-edge { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: 1px; background: var(--line-strong); transform: rotate(var(--r)); transform-origin: left center; }
-    .counterexample-trace { display: flex; align-items: center; gap: 0.45rem; min-block-size: 4.2rem; margin-block-start: var(--space-3); padding: 0.65rem; overflow-x: auto; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.62rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .trace-step { flex: 0 0 auto; padding: 0.35rem 0.5rem; border-radius: 0.3rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .trace-step[data-state="bad"] { color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
-    .trace-step[data-state="safe"] { color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
-    .verdict { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-block-size: 3.6rem; margin-block-start: 0.55rem; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.66rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .verdict strong { color: var(--faint); }
-    .verdict[data-state="fail"] strong { color: var(--red); }
-    .verdict[data-state="pass"] strong { color: var(--green); }
-    @media (max-width: 42rem) { .trace-layout { grid-template-columns: 1fr; } .protocol-panel, .model-space { min-block-size: 14rem; } }
+    .trace-scene { position: relative; min-block-size: 29rem; overflow: visible; font-family: var(--mono); }
+    .trace-brief { position: absolute; z-index: 5; inset: 0.15rem auto auto 0.15rem; display: grid; gap: 0.18rem; color: var(--muted); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .trace-brief strong { color: var(--chalk); font-size: 0.72rem; font-weight: 600; }
+    .trace-state { position: absolute; z-index: 5; inset: 0.25rem auto auto 50%; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--faint); font-family: var(--body); font-size: 0.72rem; font-weight: 600; white-space: nowrap; transform: translateX(-50%); }
+    .trace-state::before { content: ""; inline-size: 0.45rem; aspect-ratio: 1; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0.25rem color-mix(in oklch, currentColor 10%, transparent); }
+    .trace-state[data-state="checking"] { color: var(--blue); }
+    .trace-state[data-state="fail"] { color: var(--red); }
+    .trace-state[data-state="pass"] { color: var(--accent); }
+    .trace-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .trace-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .trace-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.16; }
+    .trace-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .trace-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.3; }
+    .trace-paths path[data-state="wait"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
+    .trace-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: var(--w, 9rem); min-block-size: 4.2rem; place-content: center; gap: 0.18rem; padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out; }
+    .trace-node strong { color: currentColor; font-family: var(--body); font-size: 0.72rem; white-space: nowrap; }
+    .trace-node span { font-size: 0.51rem; line-height: 1.35; white-space: nowrap; }
+    .trace-node[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -56%); }
+    .trace-node[data-state="owned"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); }
+    .trace-node[data-state="wait"], .trace-node[data-state="fail"] { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+    .trace-node[data-state="repair"], .trace-node[data-state="safe"], .trace-node[data-state="pass"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .trace-node[data-state="enforce"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); transform: translate(-50%, -50%) scale(1.05); }
+    .trace-progress { display: block; inline-size: 6rem; block-size: 2px; justify-self: center; overflow: hidden; margin-block-start: 0.2rem; background: color-mix(in oklch, currentColor 18%, transparent); opacity: 0; }
+    .trace-progress > i { display: block; inline-size: 100%; block-size: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; }
+    .trace-node[data-running="true"] .trace-progress { opacity: 1; }
+    .trace-node[data-running="true"] [data-trace-progress] { animation: trace-progress var(--task-duration) linear forwards; }
+    @keyframes trace-progress { to { transform: scaleX(1); } }
+    .trace-property { position: absolute; z-index: 4; inset: auto 15% 4% 15%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block-start: 0.55rem; border-block-start: 1px solid var(--line-strong); color: var(--muted); font-size: 0.55rem; }
+    .trace-property strong { color: var(--faint); font-family: var(--body); font-size: 0.65rem; }
+    .trace-property[data-state="fail"] { border-color: var(--red); color: var(--red); }
+    .trace-property[data-state="fail"] strong { color: var(--red); }
+    .trace-property[data-state="pass"] { border-color: var(--accent); color: var(--accent); }
+    .trace-property[data-state="pass"] strong { color: var(--accent); }
+    @media (max-width: 42rem) { .trace-scene { min-block-size: 23rem; } .trace-node { inline-size: min(var(--w, 7rem), 7rem); min-block-size: 3.5rem; } }
   </style>
 </head>
 <body>
@@ -38,37 +55,36 @@
       <div class="split">
         <div class="stage" data-demo="tracefix">
           <div class="stage-canvas">
-            <div class="trace-layout">
-              <div class="code-panel protocol-panel" aria-label="协调协议伪代码">
-                <span class="code-line" data-code="0"><span class="code-key">Ada</span>:</span>
-                <span class="code-line" data-code="1">  lock schema.prisma</span>
-                <span class="code-line" data-code="2">  lock migration.sql</span>
-                <span class="code-line" data-code="3"></span>
-                <span class="code-line" data-code="4"><span class="code-key">Lin</span>:</span>
-                <span class="code-line" data-code="5">  lock migration.sql</span>
-                <span class="code-line" data-code="6">  lock schema.prisma</span>
-                <span class="code-line" data-code="7"></span>
-                <span class="code-line" data-code="8"><span class="code-value">性质</span>: 最终释放全部文件锁</span>
-              </div>
-              <div class="model-space" aria-label="模型检查状态空间">
-                <i class="state-edge" style="--x:22%;--y:24%;--w:33%;--r:25deg;"></i><i class="state-edge" style="--x:22%;--y:24%;--w:33%;--r:65deg;"></i><i class="state-edge" style="--x:51%;--y:47%;--w:31%;--r:43deg;"></i><i class="state-edge" style="--x:41%;--y:68%;--w:38%;--r:-28deg;"></i>
-                <span class="state-node" data-state-node="0" style="--x:20%;--y:22%;">开始</span>
-                <span class="state-node" data-state-node="1" style="--x:54%;--y:43%;">Ada 锁住<br>schema</span>
-                <span class="state-node" data-state-node="2" style="--x:40%;--y:70%;">Lin 锁住<br>migration</span>
-                <span class="state-node" data-state-node="3" style="--x:78%;--y:74%;">双方等待<br>对方文件</span>
-                <span class="state-node" data-state-node="4" style="--x:82%;--y:30%;">全部释放</span>
-              </div>
+            <div class="trace-scene" aria-label="两个编码 Agent 需要同时修改 schema.prisma 和 migration.sql；模型检查器重放相反加锁顺序导致的循环等待，再把反例用于统一加锁顺序">
+              <span class="trace-brief"><strong>数据库迁移任务 · 两个共享文件</strong><span>性质 · 两个 Agent 最终都释放全部文件锁</span></span>
+              <span class="trace-state" data-trace-state>等待候选协调协议</span>
+              <svg class="trace-paths" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="trace-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="context-stroke"/></marker></defs>
+                <path data-trace-path="ada-schema" marker-end="url(#trace-arrow)" pathLength="1" d="M255 160 H430"/>
+                <path data-trace-path="lin-migration" marker-end="url(#trace-arrow)" pathLength="1" d="M255 340 H430"/>
+                <path data-trace-path="ada-wait-migration" marker-end="url(#trace-arrow)" pathLength="1" d="M255 175 H350 V310 H430"/>
+                <path data-trace-path="lin-wait-schema" marker-end="url(#trace-arrow)" pathLength="1" d="M105 340 H70 V105 H500 V125"/>
+                <path data-trace-path="schema-checker" pathLength="1" d="M570 160 H650 V250"/>
+                <path data-trace-path="migration-checker" pathLength="1" d="M570 340 H650 V250"/>
+                <path data-trace-path="checker-input" marker-end="url(#trace-arrow)" pathLength="1" d="M650 250 H735"/>
+                <path data-trace-path="lock-order" marker-end="url(#trace-arrow)" pathLength="1" d="M500 195 V305"/>
+              </svg>
+
+              <span class="trace-node" data-trace-node="ada" style="--x:18%;--y:32%;--w:10rem;"><strong>Ada</strong><span data-ada-order>schema.prisma → migration.sql</span><i class="trace-progress" aria-hidden="true"><i data-trace-progress></i></i></span>
+              <span class="trace-node" data-trace-node="lin" style="--x:18%;--y:68%;--w:10rem;"><strong>Lin</strong><span data-lin-order>migration.sql → schema.prisma</span><i class="trace-progress" aria-hidden="true"><i data-trace-progress></i></i></span>
+              <span class="trace-node" data-trace-node="schema" style="--x:50%;--y:32%;--w:8rem;"><strong>schema.prisma</strong><span data-schema-owner>未加锁</span></span>
+              <span class="trace-node" data-trace-node="migration" style="--x:50%;--y:68%;--w:8rem;"><strong>migration.sql</strong><span data-migration-owner>未加锁</span></span>
+              <span class="trace-node" data-trace-node="checker" style="--x:82%;--y:50%;--w:10rem;"><strong data-checker-title>TLC 模型检查器</strong><span data-checker-state>尚未运行</span></span>
+
+              <span class="trace-property" data-trace-property><strong>最终释放 schema.prisma 与 migration.sql</strong><span>尚未检查</span></span>
             </div>
-            <div class="counterexample-trace" aria-label="反例轨迹"><span class="trace-step" data-trace="0">开始</span><span>→</span><span class="trace-step" data-trace="1">Ada 锁 schema</span><span>→</span><span class="trace-step" data-trace="2">Lin 锁 migration</span><span>→</span><span class="trace-step" data-trace="3">双方等待</span></div>
-            <div class="verdict" data-verdict><span>有界模型检查</span><strong>尚未运行</strong></div>
           </div>
           <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="TraceFix 解释">
-          <div class="formula">protocol → model → counterexample → repair</div>
-          <div class="callout"><strong>检查性质</strong><p>两个 Agent 最终都能取得并释放 schema.prisma 与 migration.sql 的锁。</p></div>
-          <div class="callout" style="border-color: var(--violet);"><strong>检查边界</strong><p>通过表示给定有界状态空间内未发现反例，不等同于验证自然语言任务本身。</p></div>
+          <div class="formula">protocol → TLA+ → counterexample → repair</div>
+          <div class="callout" style="border-color: var(--violet);"><strong>检查边界</strong><p>TLC 检查给定边界内的协调协议；运行时监控器限制协调拓扑，但不等同于执行完整的已验证状态机。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2605.07935">阅读 TraceFix 论文 ↗</a>
         </aside>
       </div>

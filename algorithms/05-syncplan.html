@@ -9,24 +9,41 @@
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .timeline-board { display: grid; gap: 0.7rem; margin-block-start: var(--space-2); }
-    .timeline-header, .timeline-lane { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 0.7rem; align-items: center; }
-    .timeline-header { color: var(--faint); font-family: var(--mono); font-size: 0.58rem; }
-    .ticks { display: grid; grid-template-columns: repeat(6, 1fr); }
-    .ticks span { border-inline-start: 1px solid var(--line); padding-inline-start: 0.3rem; }
-    .lane-name { color: var(--muted); font-family: var(--mono); font-size: 0.68rem; }
-    .lane-track { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.28rem; min-block-size: 4.2rem; padding: 0.35rem; border-radius: var(--radius-sm); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); }
-    .action-block { display: grid; min-inline-size: 0; place-items: center; padding: 0.35rem; border-radius: 0.3rem; background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.58rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); transition-property: color, background-color, opacity, transform, box-shadow; transition-duration: 300ms; }
-    .action-block[data-state="active"] { color: var(--accent); background: var(--accent-soft); transform: translateY(-0.15rem); }
-    .action-block[data-state="done"] { color: var(--green); background: var(--green-soft); }
-    .action-block[data-state="wait"] { color: var(--blue); background: var(--blue-soft); }
-    .action-block[data-state="stale"] { color: var(--red); background: var(--red-soft); text-decoration: line-through; }
-    .action-block[data-state="deadlock"] { color: var(--red); background: var(--red-soft); box-shadow: inset 0 0 0 1px var(--red), 0 0 1rem color-mix(in oklch, var(--red) 14%, transparent); }
-    .runtime-primitives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: var(--space-4); }
-    .primitive { display: grid; min-block-size: 4.2rem; place-content: center; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
-    .primitive strong { color: var(--chalk); }
-    .primitive[data-state="active"] { color: var(--violet); box-shadow: inset 0 0 0 1px var(--violet); }
-    @media (max-width: 38rem) { .action-block { writing-mode: vertical-rl; font-size: 0.54rem; } }
+    .sync-scene { position: relative; min-block-size: 29rem; overflow: visible; font-family: var(--mono); }
+    .sync-brief { position: absolute; z-index: 4; inset: 0.15rem auto auto 0.15rem; display: grid; gap: 0.18rem; color: var(--muted); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .sync-brief strong { color: var(--chalk); font-size: 0.72rem; font-weight: 600; }
+    .sync-state { position: absolute; z-index: 5; inset: 0.25rem auto auto 50%; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--faint); font-family: var(--body); font-size: 0.72rem; font-weight: 600; white-space: nowrap; transform: translateX(-50%); }
+    .sync-state::before { content: ""; inline-size: 0.45rem; aspect-ratio: 1; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0.25rem color-mix(in oklch, currentColor 10%, transparent); }
+    .sync-state[data-state="active"] { color: var(--accent); }
+    .sync-state[data-state="wait"] { color: var(--blue); }
+    .sync-state[data-state="stale"], .sync-state[data-state="deadlock"] { color: var(--red); }
+    .sync-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .sync-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .sync-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.18; }
+    .sync-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .sync-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.28; }
+    .sync-paths path[data-state="wait"] { stroke: var(--blue); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
+    .sync-paths path[data-state="stale"], .sync-paths path[data-state="deadlock"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
+    .sync-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: var(--w, 8rem); min-block-size: 3.6rem; place-content: center; gap: 0.14rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out, filter 180ms ease-out; }
+    .sync-node strong { color: currentColor; font-family: var(--body); font-size: 0.7rem; white-space: nowrap; }
+    .sync-node span { font-size: 0.52rem; white-space: nowrap; }
+    .sync-node[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -56%); }
+    .sync-node[data-state="ready"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 0.25rem var(--accent-soft); }
+    .sync-node[data-state="done"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); }
+    .sync-node[data-state="wait"] { border-color: var(--blue); color: var(--blue); background: repeating-linear-gradient(-45deg, var(--blue-soft) 0 0.35rem, var(--ink-raised) 0.35rem 0.7rem); }
+    .sync-node[data-state="stale"], .sync-node[data-state="deadlock"] { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+    .sync-node[data-state="stale"] strong { text-decoration: line-through; }
+    .sync-node[data-visible="false"] { opacity: 0; transform: translate(-50%, -50%) scale(0.25); filter: blur(4px); }
+    .sync-node[data-visible="true"] { opacity: 1; filter: blur(0); }
+    .sync-progress { display: block; inline-size: 5.5rem; block-size: 2px; justify-self: center; overflow: hidden; margin-block-start: 0.2rem; background: color-mix(in oklch, currentColor 18%, transparent); opacity: 0; }
+    .sync-progress > i { display: block; inline-size: 100%; block-size: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; }
+    .sync-node[data-running="true"] .sync-progress, .sync-node[data-state="done"] .sync-progress { opacity: 1; }
+    .sync-node[data-running="true"] [data-sync-progress] { animation: sync-progress var(--task-duration) linear forwards; }
+    .sync-node[data-state="done"] [data-sync-progress] { transform: scaleX(1); }
+    @keyframes sync-progress { to { transform: scaleX(1); } }
+    .sync-event { border-style: dashed; }
+    .sync-event[data-state="stale"], .sync-detector[data-state="stale"] { transform: translate(-50%, -50%) scale(1.04); }
+    @media (max-width: 42rem) { .sync-scene { min-block-size: 23rem; } .sync-node { inline-size: min(var(--w, 7rem), 7rem); min-block-size: 3.15rem; } }
   </style>
 </head>
 <body>
@@ -39,20 +56,41 @@
       <div class="split">
         <div class="stage" data-demo="syncplan">
           <div class="stage-canvas">
-            <div class="timeline-board" aria-label="Agent 长周期计划时间线">
-              <div class="timeline-header"><span></span><div class="ticks"><span>t₀</span><span>t₁</span><span>t₂</span><span>t₃</span><span>t₄</span><span>t₅</span></div></div>
-              <div class="timeline-lane" data-lane="A"><span class="lane-name">Ada</span><div class="lane-track"><span class="action-block" data-action-block="A0">读取源码</span><span class="action-block" data-action-block="A1">构建镜像</span><span class="action-block" data-action-block="A2">镜像就绪</span><span class="action-block" data-action-block="A3">等待发布</span><span class="action-block" data-action-block="A4">部署 canary</span><span class="action-block" data-action-block="A5">完成</span></div></div>
-              <div class="timeline-lane" data-lane="B"><span class="lane-name">Lin</span><div class="lane-track"><span class="action-block" data-action-block="B0">准备测试</span><span class="action-block" data-action-block="B1">等待镜像</span><span class="action-block" data-action-block="B2">集成测试</span><span class="action-block" data-action-block="B3">发布汇合点</span><span class="action-block" data-action-block="B4">验证 canary</span><span class="action-block" data-action-block="B5">完成</span></div></div>
-              <div class="timeline-lane" data-lane="C"><span class="lane-name">Mira</span><div class="lane-track"><span class="action-block" data-action-block="C0">读取配置</span><span class="action-block" data-action-block="C1">生成 manifest</span><span class="action-block" data-action-block="C2">策略检查</span><span class="action-block" data-action-block="C3">发布汇合点</span><span class="action-block" data-action-block="C4">更新 manifest</span><span class="action-block" data-action-block="C5">完成</span></div></div>
+            <div class="sync-scene" aria-label="一次服务发布中，三个 Agent 按行动链异步执行，运行时用显式等待和汇合条件阻止过早部署，并在目标集群变化后重排受影响的剩余动作">
+              <span class="sync-brief"><strong>周五 18:00 发布</strong><span>目标 · payment-api 部署到 prod-cn</span></span>
+              <span class="sync-state" data-sync-state>等待生成联合计划</span>
+              <svg class="sync-paths" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="sync-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="context-stroke"/></marker></defs>
+                <path data-sync-path="build-image" marker-end="url(#sync-arrow)" pathLength="1" d="M245 140 H325"/>
+                <path data-sync-path="prepare-test" marker-end="url(#sync-arrow)" pathLength="1" d="M245 250 H455"/>
+                <path data-sync-path="wait-image" marker-end="url(#sync-arrow)" pathLength="1" d="M445 140 H475 V220 H520"/>
+                <path data-sync-path="manifest-policy" marker-end="url(#sync-arrow)" pathLength="1" d="M245 370 H355"/>
+                <path data-sync-path="test-barrier" pathLength="1" d="M585 250 H675"/>
+                <path data-sync-path="policy-barrier" pathLength="1" d="M485 370 H675 V250"/>
+                <path data-sync-path="barrier-deploy" marker-end="url(#sync-arrow)" pathLength="1" d="M675 250 H740"/>
+                <path data-sync-path="event-detector" marker-end="url(#sync-arrow)" pathLength="1" d="M785 82 H690"/>
+                <path data-sync-path="detector-impact" marker-end="url(#sync-arrow)" pathLength="1" d="M570 82 H70 V370 H110"/>
+                <path data-sync-path="deadlock-a-b" marker-end="url(#sync-arrow)" pathLength="1" d="M245 125 H455 V220 H520"/>
+                <path data-sync-path="deadlock-b-a" marker-end="url(#sync-arrow)" pathLength="1" d="M455 270 H280 V155 H245"/>
+              </svg>
+
+              <span class="sync-node" data-sync-node="build" data-visible="true" style="--x:18%;--y:28%;"><strong>构建发布镜像</strong><span>Ada</span><i class="sync-progress" aria-hidden="true"><i data-sync-progress></i></i></span>
+              <span class="sync-node" data-sync-node="image" data-visible="true" style="--x:39%;--y:28%;--w:7rem;"><strong>镜像摘要</strong><span>等待 Ada</span></span>
+              <span class="sync-node" data-sync-node="prepare" data-visible="true" style="--x:18%;--y:50%;"><strong>准备回归测试</strong><span>Lin</span><i class="sync-progress" aria-hidden="true"><i data-sync-progress></i></i></span>
+              <span class="sync-node" data-sync-node="test" data-visible="true" style="--x:52%;--y:50%;"><strong>运行回归测试</strong><span>等待镜像摘要</span><i class="sync-progress" aria-hidden="true"><i data-sync-progress></i></i></span>
+              <span class="sync-node" data-sync-node="manifest" data-visible="true" style="--x:18%;--y:74%;"><strong data-manifest-title>生成 prod-cn 配置</strong><span>Mira</span><i class="sync-progress" aria-hidden="true"><i data-sync-progress></i></i></span>
+              <span class="sync-node" data-sync-node="policy" data-visible="true" style="--x:42%;--y:74%;--w:7.5rem;"><strong>配置检查通过</strong><span>等待 Mira</span></span>
+              <span class="sync-node" data-sync-node="deploy" data-visible="true" style="--x:82%;--y:50%;"><strong>部署 payment-api</strong><span>Noah · 等待测试与配置</span><i class="sync-progress" aria-hidden="true"><i data-sync-progress></i></i></span>
+              <span class="sync-node sync-detector" data-sync-node="detector" data-visible="true" style="--x:63%;--y:16%;--w:7.5rem;"><strong>计划有效性检测</strong><span>剩余动作有效</span></span>
+              <span class="sync-node sync-event" data-sync-node="event" data-visible="true" style="--x:85%;--y:16%;--w:7.5rem;"><strong>目标集群</strong><span data-target-cluster>prod-cn</span></span>
             </div>
-            <div class="runtime-primitives" aria-label="发布同步条件"><span class="primitive" data-primitive="gate"><strong>镜像就绪</strong><span data-gate-state>Lin 等待 Ada</span></span><span class="primitive" data-primitive="barrier"><strong>发布汇合点</strong><span data-barrier-state>Lin + Mira 未到达</span></span><span class="primitive" data-primitive="stale"><strong>计划有效性</strong><span data-stale-state>剩余动作有效</span></span></div>
           </div>
           <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="deadlock" aria-pressed="false">模拟循环等待</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="SyncPlan 解释">
-          <div class="formula">wait(镜像) → barrier(测试, 配置) → deploy</div>
-          <div class="callout" style="border-color: var(--violet);"><strong>计划约束</strong><p>等待对象必须明确；运行前必须检查 wait-for 图中是否存在环。</p></div>
+          <div class="formula">Wait_agents(镜像) → deploy</div>
+          <div class="callout" style="border-color: var(--violet);"><strong>运行时约束</strong><p>等待关系由执行器检查；环境变化使剩余计划失效时才调用协调器重排。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2608.01652">阅读 SyncPlan 论文 ↗</a>
         </aside>
       </div>

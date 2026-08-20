@@ -1,47 +1,215 @@
 import { AGENT_NAMES } from '../agents.js';
-import { makeStepper, qs, qsa, setPhases, setText } from '../site.js';
+import { makeStepper, qs, qsa, setText } from '../site.js';
 
-const root = qs('[data-demo="tracefix"]');
 const [ada, lin] = AGENT_NAMES;
+const root = qs('[data-demo="tracefix"]');
 const steps = [
-  { label: `${ada} 与 ${lin} 生成了顺序相反的文件加锁协议。`, phase: 0, mode: 'synth', status: '待检查协议已生成' },
-  { label: '协议被转换为包含文件锁所有者与等待关系的状态模型。', phase: 1, mode: 'translate', status: '状态模型已生成' },
-  { label: 'Model checker 枚举两个 Agent 的可能交错执行。', phase: 2, mode: 'explore', status: '正在检查交错执行' },
-  { label: `${ada} 锁住 schema，${lin} 锁住 migration，双方继续等待对方文件。`, phase: 2, mode: 'fail', status: '发现死锁反例' },
-  { label: '修复协议要求两个 Agent 都先锁 schema，再锁 migration。', phase: 3, mode: 'repair', status: '统一加锁顺序' },
-  { label: '重新检查给定有界状态空间，没有再发现死锁反例。', phase: 3, mode: 'pass', status: '有界检查通过' },
-  { label: 'Runtime 采用通过检查的协议版本。', phase: 4, mode: 'enforce', status: '协议版本可部署' },
+  { mode: 'candidate', label: `${ada} 与 ${lin} 的候选协议规定了相反的文件加锁顺序。`, status: '候选协议已生成 · 两个进程的锁顺序相反' },
+  { mode: 'translate', label: 'TraceFix 将协调拓扑和进程体编译为 PlusCal，再由工具链转换为可供 TLC 检查的 TLA+ 模型。', status: '候选协议已转换为可检查模型' },
+  { mode: 'counterexample', label: `TLC 找到具体交错：${ada} 先持有 schema，${lin} 先持有 migration，随后双方等待对方的锁。`, status: '正在重放模型检查器返回的反例交错' },
+  { mode: 'repair', label: `修复 Agent 根据反例，把 ${lin} 的进程体改为先取得 schema，再取得 migration。`, status: '反例驱动修复 · 统一全局加锁顺序' },
+  { mode: 'pass', label: 'TLC 重新枚举给定边界内的交错，没有再找到死锁反例。', status: '重新检查完成 · 有界状态空间内未发现死锁' },
+  { mode: 'enforce', label: '已验证的进程体被编译进每个 Agent 的提示；Runtime Monitor 只允许协调拓扑中的锁和通道。', status: '已验证协议已下发 · 协调拓扑监控已启用' },
 ];
 
-const original = [`${ada}:`, '  lock schema.prisma', '  lock migration.sql', '', `${lin}:`, '  lock migration.sql', '  lock schema.prisma', '', '性质: 最终释放全部文件锁'];
-const repaired = [`${ada}:`, '  lock schema.prisma', '  lock migration.sql', '', `${lin}:`, '  lock schema.prisma', '  lock migration.sql', '', '性质: 最终释放全部文件锁'];
+const modelPaths = ['schema-checker', 'migration-checker', 'checker-input'];
+let run;
+let renderToken = 0;
+
+function randomUnit() {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return value[0] / 0x100000000;
+}
+
+function buildRun() {
+  const adaFirst = randomUnit() < 0.5;
+  run = {
+    ada: (adaFirst ? 640 : 820) + Math.round(randomUnit() * 65),
+    lin: (adaFirst ? 820 : 640) + Math.round(randomUnit() * 65),
+  };
+}
+
+function setNode(id, state = '', detail) {
+  const node = qs(`[data-trace-node="${id}"]`, root);
+  node.dataset.state = state;
+  if (detail !== undefined) setText('span', detail, node);
+}
+
+function setPath(id, state = '') {
+  qs(`[data-trace-path="${id}"]`, root).dataset.state = state;
+}
+
+function setPaths(ids, state) {
+  ids.forEach((id) => setPath(id, state));
+}
+
+function setStatus(message, state = 'checking') {
+  const status = qs('[data-trace-state]', root);
+  status.dataset.state = state;
+  status.textContent = message;
+  setText('[data-status]', message, root);
+}
+
+function setProperty(state = '', result = '尚未检查') {
+  const property = qs('[data-trace-property]', root);
+  property.dataset.state = state;
+  setText('span', result, property);
+}
+
+function setStepLocked(locked) {
+  qs('[data-action="step"]', root).disabled = locked;
+}
+
+function startProgress(id, duration, token, onComplete) {
+  const node = qs(`[data-trace-node="${id}"]`, root);
+  const bar = qs('[data-trace-progress]', node);
+  node.style.setProperty('--task-duration', `${duration}ms`);
+  bar.style.animation = 'none';
+  void bar.offsetWidth;
+  bar.style.removeProperty('animation');
+  bar.addEventListener('animationend', () => {
+    if (token !== renderToken) return;
+    node.dataset.running = 'false';
+    onComplete();
+  }, { once: true });
+  node.dataset.running = 'true';
+}
 
 function clear() {
-  qsa('[data-code]', root).forEach((node, index) => { node.dataset.state = ''; node.textContent = original[index]; });
-  qsa('[data-state-node]', root).forEach((node) => { node.dataset.state = ''; });
-  qsa('[data-trace]', root).forEach((node) => { node.dataset.state = ''; });
-  qs('[data-verdict]', root).dataset.state = ''; setText('strong', '尚未运行', qs('[data-verdict]', root)); setPhases(-1, root);
+  setStepLocked(false);
+  qsa('[data-trace-node]', root).forEach((node) => {
+    node.dataset.state = '';
+    node.dataset.running = 'false';
+    node.style.removeProperty('--task-duration');
+    const bar = qs('[data-trace-progress]', node);
+    if (bar) bar.style.animation = 'none';
+  });
+  qsa('[data-trace-path]', root).forEach((path) => { path.dataset.state = ''; });
+  setText('[data-ada-order]', 'schema.prisma → migration.sql', root);
+  setText('[data-lin-order]', 'migration.sql → schema.prisma', root);
+  setText('[data-schema-owner]', '未加锁', root);
+  setText('[data-migration-owner]', '未加锁', root);
+  setText('[data-checker-title]', 'TLC 模型检查器', root);
+  setText('[data-checker-state]', '尚未运行', root);
+  setProperty();
+  setStatus('等待候选协调协议', '');
+}
+
+function showCandidate() {
+  setNode('ada', 'active', 'schema.prisma → migration.sql');
+  setNode('lin', 'active', 'migration.sql → schema.prisma');
+  setPath('ada-schema', 'pending');
+  setPath('lin-migration', 'pending');
+  setPath('ada-wait-migration', 'pending');
+  setPath('lin-wait-schema', 'pending');
+  setPaths(modelPaths, 'pending');
+  setProperty('', '等待模型检查');
+}
+
+function showTranslated() {
+  showCandidate();
+  setNode('checker', 'active', 'PlusCal → TLA+ · 枚举交错');
+  setPaths(modelPaths, 'active');
+  setProperty('', '正在枚举可达状态');
+}
+
+function showCounterexample() {
+  showTranslated();
+  setNode('ada', 'wait', `持有 schema · 等待 migration`);
+  setNode('lin', 'wait', `持有 migration · 等待 schema`);
+  setNode('schema', 'owned', `${ada} 持有`);
+  setNode('migration', 'owned', `${lin} 持有`);
+  setPath('ada-schema', 'done');
+  setPath('lin-migration', 'done');
+  setPath('ada-wait-migration', 'wait');
+  setPath('lin-wait-schema', 'wait');
+  setNode('checker', 'fail', '反例：循环等待');
+  setProperty('fail', 'FAIL · 存在不释放锁的可达交错');
+}
+
+function showRepair() {
+  showCandidate();
+  setText('[data-lin-order]', 'schema.prisma → migration.sql', root);
+  setNode('ada', 'repair', 'schema.prisma → migration.sql');
+  setNode('lin', 'repair', 'schema.prisma → migration.sql');
+  setNode('schema', 'repair', '全局顺序 1');
+  setNode('migration', 'repair', '全局顺序 2');
+  setPath('ada-schema', 'active');
+  setPath('lin-migration', '');
+  setPath('ada-wait-migration', '');
+  setPath('lin-wait-schema', '');
+  setPath('lock-order', 'active');
+  setNode('checker', 'repair', '使用反例修订进程体');
+  setProperty('', '修复后重新检查');
+}
+
+function showPass() {
+  showRepair();
+  setNode('ada', 'safe', 'schema.prisma → migration.sql');
+  setNode('lin', 'safe', 'schema.prisma → migration.sql');
+  setNode('schema', 'safe', '先取得 · 再释放');
+  setNode('migration', 'safe', '后取得 · 再释放');
+  setPaths(modelPaths, 'done');
+  setNode('checker', 'pass', '有界检查未发现反例');
+  setProperty('pass', 'PASS · 有界状态空间内未发现死锁');
+}
+
+function replayCounterexample(token) {
+  showTranslated();
+  setStepLocked(true);
+  const remaining = new Set(['ada', 'lin']);
+  const complete = (id) => {
+    remaining.delete(id);
+    if (id === 'ada') {
+      setNode('ada', 'owned', `${ada} 已取得 schema.prisma`);
+      setNode('schema', 'owned', `${ada} 持有`);
+      setPath('ada-schema', 'active');
+    } else {
+      setNode('lin', 'owned', `${lin} 已取得 migration.sql`);
+      setNode('migration', 'owned', `${lin} 持有`);
+      setPath('lin-migration', 'active');
+    }
+    if (remaining.size) {
+      const waiting = remaining.has('ada') ? ada : lin;
+      setStatus(`反例重放中 · 等待 ${waiting} 的下一状态`, 'checking');
+      return;
+    }
+    showCounterexample();
+    setStatus(`${ada} 等待 migration，${lin} 等待 schema · 形成有向环`, 'fail');
+    setStepLocked(false);
+  };
+  setNode('ada', 'active', `${ada} · acquire schema.prisma`);
+  setNode('lin', 'active', `${lin} · acquire migration.sql`);
+  startProgress('ada', run.ada, token, () => complete('ada'));
+  startProgress('lin', run.lin, token, () => complete('lin'));
 }
 
 function render(step) {
+  const token = ++renderToken;
   clear();
-  if (!step) { setText('[data-status]', 'waiting for protocol', root); return; }
-  setText('[data-status]', step.status, root); setPhases(step.phase, root);
-  if (step.mode === 'synth') { qs('[data-code="2"]', root).dataset.state = 'active'; qs('[data-code="6"]', root).dataset.state = 'active'; }
-  if (['translate', 'explore', 'fail'].includes(step.mode)) qsa('[data-code]', root).forEach((node) => { node.dataset.state = 'active'; });
-  if (step.mode === 'translate') qs('[data-state-node="0"]', root).dataset.state = 'visited';
-  if (step.mode === 'explore') qsa('[data-state-node]', root).slice(0, 3).forEach((node) => { node.dataset.state = 'visited'; });
-  if (step.mode === 'fail') {
-    qsa('[data-state-node]', root).slice(0, 3).forEach((node) => { node.dataset.state = 'visited'; }); qs('[data-state-node="3"]', root).dataset.state = 'counterexample';
-    qsa('[data-trace]', root).forEach((node, index) => { node.dataset.state = index === 3 ? 'bad' : ''; }); qs('[data-verdict]', root).dataset.state = 'fail'; setText('strong', '发现反例 · 双方持锁等待', qs('[data-verdict]', root));
-  }
-  if (['repair', 'pass', 'enforce'].includes(step.mode)) {
-    qsa('[data-code]', root).forEach((node, index) => { node.textContent = repaired[index]; node.dataset.state = index === 5 || index === 6 ? 'active' : ''; });
-  }
-  if (step.mode === 'repair') { qs('[data-verdict]', root).dataset.state = 'fail'; setText('strong', '修复中 · 统一加锁顺序', qs('[data-verdict]', root)); }
-  if (['pass', 'enforce'].includes(step.mode)) {
-    qsa('[data-state-node]', root).forEach((node, index) => { node.dataset.state = index === 3 ? '' : 'safe'; }); qsa('[data-trace]', root).forEach((node) => { node.dataset.state = 'safe'; }); qs('[data-verdict]', root).dataset.state = 'pass'; setText('strong', step.mode === 'enforce' ? '通过检查的协议可部署' : '有界状态空间内未发现死锁', qs('[data-verdict]', root));
+  if (!step) return;
+  setStatus(step.status, step.mode === 'counterexample' ? 'checking' : step.mode === 'pass' || step.mode === 'enforce' ? 'pass' : 'checking');
+  if (step.mode === 'candidate') showCandidate();
+  if (step.mode === 'translate') showTranslated();
+  if (step.mode === 'counterexample') replayCounterexample(token);
+  if (step.mode === 'repair') showRepair();
+  if (step.mode === 'pass') showPass();
+  if (step.mode === 'enforce') {
+    showPass();
+    setText('[data-checker-title]', 'Runtime Monitor', root);
+    setNode('checker', 'enforce', '限制可用锁与协调通道');
+    setProperty('pass', '已验证进程体已下发 · 拓扑约束已启用');
   }
 }
 
-makeStepper({ root, steps, render, onReset: clear, delay: 1150 });
+makeStepper({
+  root,
+  steps,
+  render,
+  delay: 1350,
+  onReset() {
+    buildRun();
+    clear();
+  },
+});

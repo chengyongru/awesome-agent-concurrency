@@ -3,27 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示多个 Agent 如何在支付 API 迁移任务图上 claim 已就绪节点并安全加入新任务。">
+  <meta name="description" content="交互演示多个 Agent 如何在整理项目周报时，从邮件、会议纪要和预算表中发现新任务并动态扩展任务图。">
   <title>LATTE · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .dag-area { position: relative; min-block-size: 25rem; overflow: hidden; border-radius: var(--radius-md); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line); }
-    .dag-edges { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; color: var(--line-strong); }
-    .dag-edges line { stroke: currentColor; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
-    .task-node { position: absolute; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: clamp(5rem, 12vw, 7rem); min-block-size: 4.2rem; place-content: center; padding: 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.66rem; text-align: center; transform: translate(-50%, -50%); transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 300ms; }
-    .task-node strong { color: var(--chalk); font-size: 0.78rem; }
-    .task-node[data-state="ready"] { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 1.2rem color-mix(in oklch, var(--blue) 12%, transparent); }
-    .task-node[data-state="claimed"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translate(-50%, -58%); }
-    .task-node[data-state="done"] { border-color: var(--green); color: var(--green); background: var(--green-soft); }
-    .task-node[data-state="review"] { border-style: dashed; border-color: var(--violet); color: var(--violet); }
-    .frontier-strip { display: flex; align-items: center; gap: 0.6rem; min-block-size: 3.2rem; margin-block-start: var(--space-3); padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.68rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .frontier-strip strong { color: var(--blue); }
-    .worker-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem; margin-block-start: 0.55rem; }
-    .worker { min-block-size: 2.8rem; padding: 0.55rem; border-radius: var(--radius-sm); background: var(--ink-raised); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
-    .worker[data-state="busy"] { color: var(--yellow); }
-    @media (max-width: 38rem) { .task-node { inline-size: 4.6rem; min-block-size: 3.7rem; } }
+    .latte-scene { position: relative; min-block-size: 29rem; overflow: visible; font-family: var(--mono); }
+    .dataset-brief { position: absolute; z-index: 4; inset: 0.15rem auto auto 0.15rem; display: grid; gap: 0.18rem; color: var(--muted); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .dataset-brief strong { color: var(--chalk); font-size: 0.72rem; font-weight: 600; }
+    .scene-state { position: absolute; z-index: 4; inset: 0.25rem auto auto 50%; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--faint); font-family: var(--body); font-size: 0.72rem; font-weight: 600; white-space: nowrap; transform: translateX(-50%); transition: color 180ms ease-out; }
+    .scene-state::before { content: ""; inline-size: 0.45rem; aspect-ratio: 1; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0.25rem color-mix(in oklch, currentColor 10%, transparent); }
+    .scene-state[data-state="active"] { color: var(--accent); }
+    .scene-state[data-state="review"] { color: var(--blue); }
+    .latte-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .latte-paths > path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .latte-paths > path.dynamic-edge[data-state="review"] { stroke: var(--blue); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 0.85; transition-delay: var(--path-delay, 0ms); }
+    .latte-paths > path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.17; }
+    .latte-paths > path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .latte-paths > path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.24; }
+    .latte-paths > path.claim-edge { stroke: var(--accent); stroke-linecap: round; stroke-linejoin: round; }
+    .task-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: 8rem; min-block-size: 3.8rem; place-content: center; gap: 0.16rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); font-family: var(--mono); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, color 180ms ease-out, background-color 180ms ease-out, transform 220ms ease-out, opacity 220ms ease-out, filter 220ms ease-out; transition-delay: var(--reveal-delay, 0ms); }
+    .task-node strong { color: currentColor; font-family: var(--body); font-size: 0.72rem; white-space: nowrap; }
+    .task-node span { font-size: 0.54rem; white-space: nowrap; }
+    .task-progress { display: block; inline-size: 5.8rem; block-size: 2px; justify-self: center; overflow: hidden; margin-block-start: 0.18rem; background: color-mix(in oklch, currentColor 18%, transparent); opacity: 0; transition: opacity 160ms ease-out; }
+    .task-progress > i { display: block; inline-size: 100%; block-size: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; }
+    .task-node[data-state="claimed"] .task-progress, .task-node[data-state="done"] .task-progress { opacity: 1; }
+    .task-node[data-running="true"] [data-task-progress] { animation: latte-task-progress var(--task-duration) linear forwards; }
+    .task-node[data-state="done"] [data-task-progress] { transform: scaleX(1); }
+    @keyframes latte-task-progress { to { transform: scaleX(1); } }
+    .task-node[data-state="ready"] { border-color: var(--accent); color: var(--accent); transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 0 0 0.28rem var(--accent-soft); }
+    .task-node[data-state="claimed"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -56%); }
+    .task-node[data-state="done"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); }
+    .task-node[data-state="review"] { border-style: dashed; border-color: var(--blue); color: var(--blue); transform: translate(-50%, -50%) scale(1.05); }
+    .task-node[data-visible="false"] { opacity: 0; transform: translate(-50%, -50%) scale(0.25); filter: blur(4px); }
+    .task-node[data-visible="true"] { opacity: 1; filter: blur(0); }
+    .agent-pod, .lead-gate { position: absolute; z-index: 3; inset-block-start: 91%; display: grid; min-block-size: 3.35rem; place-content: center; gap: 0.12rem; border-block-start: 1px solid var(--line-strong); background: transparent; color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out; }
+    .agent-pod { inline-size: 8rem; }
+    .agent-pod strong, .lead-gate strong { color: currentColor; font-family: var(--body); font-size: 0.72rem; }
+    .agent-pod span, .lead-gate span { font-size: 0.5rem; white-space: nowrap; }
+    .agent-pod[data-state="active"] { border-color: var(--accent); background: linear-gradient(to bottom, var(--accent-soft), transparent 78%); color: var(--accent); transform: translate(-50%, -54%); }
+    .agent-pod[data-state="idle"] { color: var(--muted); }
+    .agent-pod--ada { inset-inline-start: 19%; }
+    .agent-pod--lin { inset-inline-start: 40%; }
+    .agent-pod--mira { inset-inline-start: 61%; }
+    .lead-gate { inset-inline-start: 84%; inline-size: 9rem; }
+    .lead-gate[data-state="review"] { border-color: var(--blue); background: linear-gradient(to bottom, var(--blue-soft), transparent 78%); color: var(--blue); transform: translate(-50%, -54%); }
+    .lead-gate[data-state="accepted"] { border-color: var(--accent); color: var(--accent); }
+    @media (max-width: 42rem) { .latte-scene { min-block-size: 23rem; } .task-node { inline-size: 6rem; min-block-size: 3.25rem; } .agent-pod { inline-size: 5rem; } .lead-gate { inline-size: 6.6rem; } }
   </style>
 </head>
 <body>
@@ -32,22 +59,41 @@
   <main id="main">
     <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">04 · Adaptive graph</span><h1 class="spacer-top"><span class="accent-blue">LATTE</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">支付 API 迁移任务图</h2></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">项目周报整理</h2></div>
       <div class="split">
         <div class="stage" data-demo="latte">
           <div class="stage-canvas">
-            <div class="dag-area" aria-label="动态任务依赖图">
-              <svg class="dag-edges" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs><line x1="190" y1="100" x2="430" y2="175" marker-end="url(#arrow)"/><line x1="190" y1="235" x2="430" y2="185" marker-end="url(#arrow)"/><line x1="520" y1="180" x2="760" y2="130" marker-end="url(#arrow)"/><line x1="190" y1="385" x2="745" y2="365" marker-end="url(#arrow)"/><line x1="520" y1="180" x2="750" y2="365" marker-end="url(#arrow)"/></svg>
-              <span class="task-node" data-task="A" style="--x: 14%; --y: 20%;"><strong>检查旧 API</strong><span data-task-owner>等待 claim</span></span>
-              <span class="task-node" data-task="B" style="--x: 14%; --y: 47%;"><strong>统计调用方</strong><span data-task-owner>等待 claim</span></span>
-              <span class="task-node" data-task="D" style="--x: 14%; --y: 78%;"><strong>收集测试样本</strong><span data-task-owner>等待 claim</span></span>
-              <span class="task-node" data-task="C" style="--x: 48%; --y: 36%;"><strong>实现适配器</strong><span data-task-owner>依赖前两项</span></span>
-              <span class="task-node" data-task="E" style="--x: 82%; --y: 25%;"><strong>集成测试</strong><span data-task-owner>等待适配器</span></span>
-              <span class="task-node" data-task="F" style="--x: 82%; --y: 73%;"><strong>发布迁移说明</strong><span data-task-owner>等待适配器与样本</span></span>
-              <span class="task-node" data-task="G" style="--x: 61%; --y: 88%; opacity: 0;"><strong>兼容性检查</strong><span data-task-owner>等待 Lead 审核</span></span>
+            <div class="latte-scene" aria-label="团队整理项目周报；Ada 阅读邮件、会议纪要和预算表后发现新的办公任务，Lead 将它们加入任务图，空闲 Worker 再自主领取">
+              <span class="dataset-brief"><strong>本周邮件 · 会议纪要 · budget.xlsx</strong><span>目标 · 生成周五项目周报</span></span>
+              <span class="scene-state" data-scene-state>等待建立初始任务图</span>
+              <svg class="latte-paths" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="latte-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+                <path class="dynamic-edge" pathLength="1" data-path="discover-trunk" style="--path-delay: 0ms" d="M210 210 H300"/>
+                <path class="dynamic-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="seed-budget" style="--path-delay: 80ms" d="M300 210 V90 H410"/>
+                <path class="dynamic-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="seed-schedule" style="--path-delay: 160ms" d="M300 210 H410"/>
+                <path class="dynamic-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="seed-risk" style="--path-delay: 240ms" d="M300 210 V330 H410"/>
+                <path class="dynamic-edge" pathLength="1" data-path="budget-merge" style="--path-delay: 320ms" d="M530 90 H650 V210"/>
+                <path class="dynamic-edge" pathLength="1" data-path="schedule-merge" style="--path-delay: 400ms" d="M530 210 H650"/>
+                <path class="dynamic-edge" pathLength="1" data-path="risk-merge" style="--path-delay: 480ms" d="M530 330 H650 V210"/>
+                <path class="dynamic-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="merge-report" style="--path-delay: 560ms" d="M650 210 H720"/>
+                <path class="claim-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="claim-seed" data-from="worker-0" data-to="seed" d="M190 438 H105 V250 H150 V240"/>
+                <path class="claim-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="claim-budget" data-from="worker-0" data-to="budget" d="M190 438 H50 V45 H470 V60"/>
+                <path class="claim-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="claim-schedule" data-from="worker-1" data-to="schedule" d="M400 438 H440 V275 H470 V240"/>
+                <path class="claim-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="claim-risk" data-from="worker-2" data-to="risk" d="M610 438 H570 V370 H470 V360"/>
+                <path class="claim-edge" pathLength="1" marker-end="url(#latte-arrow)" data-path="claim-report" data-from="worker-1" data-to="report" d="M400 438 H445 V400 H760 V250 H780 V240"/>
+              </svg>
+
+              <span class="task-node" data-task="seed" data-visible="true" style="--x: 15%; --y: 42%;"><strong>阅读本周资料</strong><span data-task-owner>等待初始化</span><i class="task-progress" aria-hidden="true"><i data-task-progress></i></i></span>
+              <span class="task-node" data-task="budget" data-visible="false" style="--x: 47%; --y: 18%; --reveal-delay: 120ms;"><strong>核对预算差异</strong><span data-task-owner>尚未发现</span><i class="task-progress" aria-hidden="true"><i data-task-progress></i></i></span>
+              <span class="task-node" data-task="schedule" data-visible="false" style="--x: 47%; --y: 42%; --reveal-delay: 200ms;"><strong>更新延期进度</strong><span data-task-owner>尚未发现</span><i class="task-progress" aria-hidden="true"><i data-task-progress></i></i></span>
+              <span class="task-node" data-task="risk" data-visible="false" style="--x: 47%; --y: 66%; --reveal-delay: 280ms;"><strong>整理客户风险</strong><span data-task-owner>尚未发现</span><i class="task-progress" aria-hidden="true"><i data-task-progress></i></i></span>
+              <span class="task-node" data-task="report" data-visible="false" style="--x: 78%; --y: 42%; --reveal-delay: 600ms;"><strong>生成项目周报</strong><span data-task-owner>等待三项任务</span><i class="task-progress" aria-hidden="true"><i data-task-progress></i></i></span>
+
+              <span class="agent-pod agent-pod--ada" data-worker="0"><strong>Ada</strong><span data-worker-task>空闲</span></span>
+              <span class="agent-pod agent-pod--lin" data-worker="1"><strong>Lin</strong><span data-worker-task>空闲</span></span>
+              <span class="agent-pod agent-pod--mira" data-worker="2"><strong>Mira</strong><span data-worker-task>空闲</span></span>
+              <span class="lead-gate" data-lead><strong>Noah · Lead</strong><span data-lead-state>等待图变更</span></span>
             </div>
-            <div class="frontier-strip"><span>当前可领取</span><strong data-frontier>检查旧 API · 统计调用方 · 收集测试样本</strong></div>
-            <div class="worker-strip"><span class="worker" data-worker="0">Ada · 空闲</span><span class="worker" data-worker="1">Lin · 空闲</span><span class="worker" data-worker="2">Mira · 空闲</span></div>
           </div>
           <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>

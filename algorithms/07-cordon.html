@@ -3,30 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互演示多个 Agent 提议线上扩容时，如何在执行前重新验证事实、权限与用户批准。">
+  <meta name="description" content="交互演示多个 Agent 共同处理客服退款时，Cordon 如何将结果 lineage、shadow state、effect outbox 与权限绑定到同一个提交边界。">
   <title>Cordon · Awesome Agent Concurrency</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .lineage { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; align-items: stretch; margin-block: var(--space-3) var(--space-4); }
-    .lineage-node { position: relative; display: grid; min-block-size: 8rem; align-content: center; gap: 0.4rem; padding: 0.75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--ink-soft); color: var(--faint); text-align: center; transition-property: border-color, color, background-color, transform, opacity, box-shadow; transition-duration: 320ms; }
-    .lineage-node:not(:last-child)::after { content: "→"; position: absolute; inset-block-start: 50%; inset-inline-end: -0.75rem; z-index: 3; color: var(--faint); font-family: var(--mono); transform: translateY(-50%); }
-    .lineage-node span { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
-    .lineage-node strong { color: var(--chalk); font-size: 0.78rem; line-height: 1.35; }
-    .lineage-node[data-state="active"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-0.25rem); }
-    .lineage-node[data-state="valid"] { border-color: var(--green); color: var(--green); background: var(--green-soft); }
-    .lineage-node[data-state="invalid"] { border-color: var(--red); color: var(--red); background: var(--red-soft); text-decoration: line-through; }
-    .validation-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; }
-    .validation { display: grid; min-block-size: 5.4rem; place-content: center; gap: 0.25rem; padding: 0.65rem; border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.62rem; text-align: center; box-shadow: inset 0 0 0 1px var(--line); }
-    .validation strong { color: var(--chalk); }
-    .validation[data-state="checking"] { color: var(--yellow); box-shadow: inset 0 0 0 1px var(--yellow); }
-    .validation[data-state="valid"] { color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
-    .validation[data-state="invalid"] { color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
-    .settlement-banner { display: grid; min-block-size: 3.6rem; place-items: center; margin-block-start: var(--space-3); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--muted); font-family: var(--mono); font-size: 0.7rem; box-shadow: inset 0 0 0 1px var(--line); }
-    .settlement-banner[data-state="commit"] { color: var(--green); background: var(--green-soft); box-shadow: inset 0 0 0 1px var(--green); }
-    .settlement-banner[data-state="abort"] { color: var(--red); background: var(--red-soft); box-shadow: inset 0 0 0 1px var(--red); }
-    @media (max-width: 42rem) { .lineage { grid-template-columns: 1fr 1fr; } .lineage-node:nth-child(2)::after { content: "↓"; inset-block-start: auto; inset-block-end: -0.9rem; inset-inline-end: 50%; transform: translateX(50%); } }
+    .cordon-scene { position: relative; min-block-size: 29rem; overflow: visible; font-family: var(--mono); }
+    .cordon-brief { position: absolute; z-index: 5; inset: 0.15rem auto auto 0.15rem; display: grid; gap: 0.18rem; color: var(--muted); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .cordon-brief strong { color: var(--chalk); font-size: 0.72rem; font-weight: 600; }
+    .cordon-state { position: absolute; z-index: 5; inset: 0.25rem auto auto 50%; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--faint); font-family: var(--body); font-size: 0.72rem; font-weight: 600; white-space: nowrap; transform: translateX(-50%); }
+    .cordon-state::before { content: ""; inline-size: 0.45rem; aspect-ratio: 1; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0.25rem color-mix(in oklch, currentColor 10%, transparent); }
+    .cordon-state[data-state="active"] { color: var(--accent); }
+    .cordon-state[data-state="checking"] { color: var(--yellow); }
+    .cordon-state[data-state="abort"] { color: var(--red); }
+    .cordon-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .cordon-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .cordon-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.16; }
+    .cordon-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .cordon-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.28; }
+    .cordon-paths path[data-state="blocked"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
+    .cordon-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: var(--w, 8rem); min-block-size: 3.8rem; place-content: center; gap: 0.14rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out; }
+    .cordon-node strong { color: currentColor; font-family: var(--body); font-size: 0.7rem; white-space: nowrap; }
+    .cordon-node span { font-size: 0.5rem; white-space: nowrap; }
+    .cordon-node[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -56%); }
+    .cordon-node[data-state="done"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); }
+    .cordon-node[data-state="staged"] { border-color: var(--accent); color: var(--accent); background: linear-gradient(90deg, transparent, var(--accent-soft), transparent); }
+    .cordon-node[data-state="checking"] { border-color: var(--yellow); color: var(--yellow); }
+    .cordon-node[data-state="commit"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); transform: translate(-50%, -50%) scale(1.05); }
+    .cordon-node[data-state="abort"] { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+    .cordon-progress { display: block; inline-size: 5.5rem; block-size: 2px; justify-self: center; overflow: hidden; margin-block-start: 0.2rem; background: color-mix(in oklch, currentColor 18%, transparent); opacity: 0; }
+    .cordon-progress > i { display: block; inline-size: 100%; block-size: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; }
+    .cordon-node[data-running="true"] .cordon-progress, .cordon-node[data-state="done"] .cordon-progress { opacity: 1; }
+    .cordon-node[data-running="true"] [data-cordon-progress] { animation: cordon-progress var(--task-duration) linear forwards; }
+    .cordon-node[data-state="done"] [data-cordon-progress] { transform: scaleX(1); }
+    @keyframes cordon-progress { to { transform: scaleX(1); } }
+    .cordon-checks { position: absolute; z-index: 4; inset: auto 7% 2% 7%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; }
+    .cordon-check { display: grid; gap: 0.18rem; padding-block-start: 0.45rem; border-block-start: 1px solid var(--line-strong); color: var(--muted); font-size: 0.52rem; text-align: center; }
+    .cordon-check strong { color: var(--faint); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .cordon-check[data-state="checking"] { border-color: var(--yellow); color: var(--yellow); }
+    .cordon-check[data-state="valid"] { border-color: var(--accent); color: var(--accent); }
+    .cordon-check[data-state="invalid"] { border-color: var(--red); color: var(--red); }
+    .cordon-check[data-state="invalid"] strong { color: var(--red); }
+    @media (max-width: 42rem) { .cordon-scene { min-block-size: 23rem; } .cordon-node { inline-size: min(var(--w, 7rem), 7rem); min-block-size: 3.25rem; } }
   </style>
 </head>
 <body>
@@ -35,29 +54,48 @@
   <main id="main">
     <section class="hero algorithm-hero page-shell"><div class="hero-copy"><span class="eyebrow">07 · Semantic commit</span><h1 class="spacer-top"><span class="accent-yellow">Cordon</span></h1></div></section>
     <section class="section page-shell" aria-labelledby="demo-title">
-      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">扩容授权检查</h2></div>
+      <div class="section-heading"><span class="eyebrow">Live protocol</span><h2 id="demo-title">客服退款提交</h2></div>
       <div class="split">
         <div class="stage" data-demo="cordon">
           <div class="stage-canvas">
-            <div class="lineage" aria-label="决策 lineage">
-              <div class="lineage-node" data-lineage="0"><span>Ada · 监控</span><strong data-observation>队列 1280 · CPU 94%</strong></div>
-              <div class="lineage-node" data-lineage="1"><span>Lin · 诊断</span><strong>payment-api 容量不足</strong></div>
-              <div class="lineage-node" data-lineage="2"><span>Mira · 提议</span><strong>副本数 4 → 6</strong></div>
-              <div class="lineage-node" data-lineage="3"><span>Omar · 执行</span><strong>部署并通知值班人员</strong></div>
+            <div class="cordon-scene" aria-label="多个 Agent 依次读取客服工单与订单状态，生成退款决定，将本地备注写入 shadow state，把退款和邮件放入 effect outbox，并在提交前统一检查 lineage、权限和最新订单状态">
+              <span class="cordon-brief"><strong>客服工单 #913 · 订单 #482 · ¥85</strong><span>目标 · 审核破损商品退款并回复客户</span></span>
+              <span class="cordon-state" data-cordon-state>等待开启语义事务</span>
+              <svg class="cordon-paths" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="cordon-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="context-stroke"/></marker></defs>
+                <path data-cordon-path="ticket-order" marker-end="url(#cordon-arrow)" pathLength="1" d="M200 145 H270"/>
+                <path data-cordon-path="order-decision" marker-end="url(#cordon-arrow)" pathLength="1" d="M410 145 H475"/>
+                <path data-cordon-path="decision-trunk" pathLength="1" d="M610 145 H655"/>
+                <path data-cordon-path="decision-shadow" marker-end="url(#cordon-arrow)" pathLength="1" d="M655 145 V115 H695"/>
+                <path data-cordon-path="decision-refund" marker-end="url(#cordon-arrow)" pathLength="1" d="M655 145 V240 H695"/>
+                <path data-cordon-path="decision-email" marker-end="url(#cordon-arrow)" pathLength="1" d="M655 145 V350 H695"/>
+                <path data-cordon-path="shadow-gate" pathLength="1" d="M825 115 H850 V240"/>
+                <path data-cordon-path="refund-gate" pathLength="1" d="M825 240 H850"/>
+                <path data-cordon-path="email-gate" pathLength="1" d="M825 350 H850 V240"/>
+                <path data-cordon-path="gate-release" marker-end="url(#cordon-arrow)" pathLength="1" d="M850 240 H875"/>
+              </svg>
+
+              <span class="cordon-node" data-cordon-node="ticket" style="--x:13%;--y:29%;"><strong>商品破损工单</strong><span>Ada · 读取 #913</span><i class="cordon-progress" aria-hidden="true"><i data-cordon-progress></i></i></span>
+              <span class="cordon-node" data-cordon-node="order" style="--x:34%;--y:29%;"><strong>订单 #482 · ¥85</strong><span>Lin · 查询支付状态</span><i class="cordon-progress" aria-hidden="true"><i data-cordon-progress></i></i></span>
+              <span class="cordon-node" data-cordon-node="decision" style="--x:54%;--y:29%;"><strong>原路退款 ¥85</strong><span>Mira · 由工单和订单推导</span><i class="cordon-progress" aria-hidden="true"><i data-cordon-progress></i></i></span>
+              <span class="cordon-node" data-cordon-node="shadow" style="--x:76%;--y:23%;--w:7.5rem;"><strong>客服备注</strong><span>shadow state · 未提交</span></span>
+              <span class="cordon-node" data-cordon-node="refund" style="--x:76%;--y:48%;--w:7.5rem;"><strong>退款 ¥85</strong><span>effect outbox · pending</span></span>
+              <span class="cordon-node" data-cordon-node="email" style="--x:76%;--y:70%;--w:7.5rem;"><strong>退款结果邮件</strong><span>effect outbox · pending</span></span>
+              <span class="cordon-node" data-cordon-node="gate" style="--x:92%;--y:48%;--w:7rem;"><strong>提交门</strong><span data-gate-result>尚未验证</span></span>
+
+              <div class="cordon-checks" aria-label="提交前语义检查">
+                <span class="cordon-check" data-cordon-check="lineage"><strong>结果来源</strong><span>工单 #913 → 订单 #482 → ¥85</span></span>
+                <span class="cordon-check" data-cordon-check="authority"><strong>委托权限</strong><span>客服退款上限 ¥100</span></span>
+                <span class="cordon-check" data-cordon-check="current"><strong>最新订单状态</strong><span data-current-order>尚未退款</span></span>
+              </div>
             </div>
-            <div class="validation-grid" aria-label="语义验证条件">
-              <div class="validation" data-check="lineage"><strong>事实仍成立</strong><span data-lineage-check>队列与 CPU 仍超过阈值</span></div>
-              <div class="validation" data-check="authority"><strong>动作在权限内</strong><span>仅 payment-api · 最多 6 副本</span></div>
-              <div class="validation" data-check="intent"><strong>批准仍有效</strong><span>扩容批准有效至 14:30</span></div>
-            </div>
-            <div class="settlement-banner" data-settlement>扩容操作尚未执行</div>
           </div>
-          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="stale-mode" aria-pressed="false">模拟负载恢复</button></div></div>
+          <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="stale-mode" aria-pressed="false">模拟订单已退款</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
         </div>
         <aside class="narrative" aria-label="Cordon 解释">
-          <div class="formula">observe → diagnose → authorize → execute</div>
-          <div class="callout" style="border-color: var(--yellow);"><strong>提交条件</strong><p>事实、动作范围与批准时间窗必须在外部操作执行前同时有效。</p></div>
+          <div class="formula">lineage + shadow state + outbox + authority</div>
+          <div class="callout" style="border-color: var(--yellow);"><strong>事务边界</strong><p>本地修改和外部动作在任务级提交前保持不可见；验证失败则中止整组效果。</p></div>
           <a class="source-link" href="https://arxiv.org/abs/2606.17573">阅读 Cordon 论文 ↗</a>
         </aside>
       </div>

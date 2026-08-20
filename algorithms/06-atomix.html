@@ -9,26 +9,54 @@
   <link rel="stylesheet" href="../assets/site.css">
   <style>
     .algorithm-hero h1 { max-inline-size: 10ch; }
-    .transaction-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; gap: 0.4rem; margin-block-end: var(--space-4); }
-    .tx-node { position: relative; display: grid; min-block-size: 4.2rem; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--ink-soft); color: var(--faint); font-family: var(--mono); font-size: 0.64rem; text-align: center; transition-property: color, background-color, border-color, transform, box-shadow; transition-duration: 300ms; }
-    .tx-node:not(:last-child)::after { content: "→"; position: absolute; inset-inline-end: -0.55rem; z-index: 2; color: var(--faint); }
-    .tx-node[data-state="active"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); transform: translateY(-0.2rem); box-shadow: 0 0 1rem color-mix(in oklch, var(--accent) 12%, transparent); }
-    .tx-node[data-state="done"] { border-color: var(--green); color: var(--green); }
-    .tx-node[data-state="abort"] { border-color: var(--red); color: var(--red); background: var(--red-soft); }
-    .effect-stack { display: grid; gap: 0.55rem; }
-    .effect { display: grid; grid-template-columns: 5.7rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-block-size: 4rem; padding: 0.65rem 0.75rem; border-radius: var(--radius-sm); background: var(--ink-raised); box-shadow: inset 0 0 0 1px var(--line); }
-    .effect-class { color: var(--effect-color); font-family: var(--mono); font-size: 0.62rem; }
-    .effect strong { display: block; font-size: 0.78rem; }
-    .effect small { color: var(--faint); font-family: var(--mono); }
-    .effect-state { min-inline-size: 4.8rem; color: var(--muted); text-align: end; font-family: var(--mono); font-size: 0.62rem; }
-    .effect[data-state="staged"] .effect-state { color: var(--yellow); }
-    .effect[data-state="released"] .effect-state { color: var(--green); }
-    .effect[data-state="compensated"] .effect-state { color: var(--violet); }
-    .effect[data-state="blocked"] .effect-state { color: var(--red); }
-    .frontier { display: flex; align-items: center; gap: 0.75rem; margin-block-start: var(--space-4); color: var(--muted); font-family: var(--mono); font-size: 0.65rem; }
-    .frontier-track { flex: 1; block-size: 0.35rem; border-radius: 99rem; background: var(--line-strong); overflow: hidden; }
-    .frontier-fill { display: block; block-size: 100%; inline-size: var(--frontier, 0%); background: var(--green); transition: inline-size 400ms ease-out; }
-    @media (max-width: 38rem) { .effect { grid-template-columns: 4.8rem minmax(0, 1fr); } .effect-state { grid-column: 2; text-align: start; } .transaction-flow { gap: 0.2rem; } .tx-node { font-size: 0.52rem; } }
+    .atomix-scene { position: relative; min-block-size: 29rem; overflow: visible; font-family: var(--mono); }
+    .atomix-brief { position: absolute; z-index: 5; inset: 0.15rem auto auto 0.15rem; display: grid; gap: 0.18rem; color: var(--muted); font-family: var(--body); font-size: 0.62rem; white-space: nowrap; }
+    .atomix-brief strong { color: var(--chalk); font-size: 0.72rem; font-weight: 600; }
+    .atomix-state { position: absolute; z-index: 5; inset: 0.25rem auto auto 50%; display: inline-flex; align-items: center; gap: 0.45rem; color: var(--faint); font-family: var(--body); font-size: 0.72rem; font-weight: 600; white-space: nowrap; transform: translateX(-50%); }
+    .atomix-state::before { content: ""; inline-size: 0.45rem; aspect-ratio: 1; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0.25rem color-mix(in oklch, currentColor 10%, transparent); }
+    .atomix-state[data-state="active"] { color: var(--accent); }
+    .atomix-state[data-state="wait"] { color: var(--blue); }
+    .atomix-state[data-state="abort"] { color: var(--red); }
+    .atomix-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
+    .atomix-paths path, .atomix-paths line { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .atomix-paths path { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .atomix-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.17; }
+    .atomix-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
+    .atomix-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.28; }
+    .atomix-paths path[data-state="blocked"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 0.8; }
+    .atomix-paths path[data-state="compensate"] { stroke: var(--red); stroke-dashoffset: 0; opacity: 1; }
+    .atomix-gate-line { opacity: 0.3; stroke-dasharray: 4 5; }
+    .atomix-gate-label { position: absolute; z-index: 3; inset: 8% auto auto 66%; color: var(--faint); font-size: 0.55rem; letter-spacing: 0.08em; transform: translateX(-50%); white-space: nowrap; }
+    .atomix-gate-label[data-state="ready"] { color: var(--accent); }
+    .atomix-gate-label[data-state="abort"] { color: var(--red); }
+    .atomix-task, .atomix-effect, .atomix-sink { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; place-content: center; gap: 0.14rem; text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out, filter 180ms ease-out; }
+    .atomix-task { inline-size: 9rem; min-block-size: 3.5rem; padding: 0.4rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); }
+    .atomix-task strong, .atomix-effect strong, .atomix-sink strong { color: currentColor; font-family: var(--body); font-size: 0.68rem; white-space: nowrap; }
+    .atomix-task span, .atomix-effect span, .atomix-sink span { font-size: 0.5rem; white-space: nowrap; }
+    .atomix-task[data-state="ready"] { border-color: var(--accent); color: var(--accent); }
+    .atomix-task[data-state="active"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); transform: translate(-50%, -56%); }
+    .atomix-task[data-state="done"] { border-color: var(--accent); background: var(--accent); color: var(--ink-raised); }
+    .atomix-effect { inline-size: 10rem; min-block-size: 3.4rem; padding-inline: 0.35rem; border-block: 1px solid var(--line-strong); color: var(--faint); }
+    .atomix-effect[data-state="staged"] { border-color: var(--accent); color: var(--accent); background: linear-gradient(90deg, transparent, var(--accent-soft), transparent); }
+    .atomix-effect[data-state="released"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .atomix-effect[data-state="compensated"], .atomix-effect[data-state="discarded"] { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+    .atomix-sink { inline-size: 8.5rem; min-block-size: 3.1rem; border-block-start: 1px solid var(--line-strong); color: var(--muted); opacity: 0.38; }
+    .atomix-sink[data-state="visible"] { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .atomix-sink[data-state="cancelled"] { border-color: var(--red); color: var(--red); opacity: 1; }
+    .atomix-progress { display: block; inline-size: 6rem; block-size: 2px; justify-self: center; overflow: hidden; margin-block-start: 0.2rem; background: color-mix(in oklch, currentColor 18%, transparent); opacity: 0; }
+    .atomix-progress > i { display: block; inline-size: 100%; block-size: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; }
+    .atomix-task[data-running="true"] .atomix-progress, .atomix-task[data-state="done"] .atomix-progress { opacity: 1; }
+    .atomix-task[data-running="true"] [data-atomix-progress] { animation: atomix-progress var(--task-duration) linear forwards; }
+    .atomix-task[data-state="done"] [data-atomix-progress] { transform: scaleX(1); }
+    @keyframes atomix-progress { to { transform: scaleX(1); } }
+    .atomix-frontiers { position: absolute; z-index: 4; inset: auto 6% 0.2rem 6%; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .resource-frontier { display: grid; grid-template-columns: auto minmax(6rem, 1fr) auto; align-items: center; gap: 0.55rem; color: var(--muted); font-size: 0.52rem; white-space: nowrap; }
+    .resource-frontier i { position: relative; display: block; block-size: 2px; overflow: hidden; background: var(--line-strong); }
+    .resource-frontier i::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left center; transition: transform 480ms ease-out; }
+    .resource-frontier[data-state="ready"] { color: var(--accent); }
+    .resource-frontier[data-state="ready"] i::after { transform: scaleX(1); }
+    .resource-frontier[data-state="wait"] { color: var(--blue); }
+    @media (max-width: 42rem) { .atomix-scene { min-block-size: 23rem; } .atomix-task { inline-size: 7rem; } .atomix-effect { inline-size: 7.8rem; } .atomix-sink { inline-size: 6.5rem; } }
   </style>
 </head>
 <body>
@@ -41,14 +69,45 @@
       <div class="split">
         <div class="stage" data-demo="atomix">
           <div class="stage-canvas">
-            <div class="transaction-flow" aria-label="差旅事务阶段"><span class="tx-node" data-tx="0">开启事务</span><span class="tx-node" data-tx="1">执行工具</span><span class="tx-node" data-tx="2">冻结范围</span><span class="tx-node" data-tx="3">等待确认</span><span class="tx-node" data-tx="4">结算</span></div>
-            <div class="effect-stack" aria-label="工具副作用">
-              <div class="effect" data-effect="patch" style="--effect-color: var(--blue);"><span class="effect-class">可暂存</span><div><strong>Ada · 生成行程草稿</strong><small>只保存在事务工作区</small></div><span class="effect-state">未执行</span></div>
-              <div class="effect" data-effect="booking" style="--effect-color: var(--violet);"><span class="effect-class">可补偿</span><div><strong>Lin · 预留酒店</strong><small>补偿操作：取消预留</small></div><span class="effect-state">未执行</span></div>
-              <div class="effect" data-effect="payment" style="--effect-color: var(--yellow);"><span class="effect-class">可补偿</span><div><strong>Mira · 创建支付意图</strong><small>取消意图 · 幂等键 trip-42-payment</small></div><span class="effect-state">未执行</span></div>
-              <div class="effect" data-effect="email" style="--effect-color: var(--red);"><span class="effect-class">不可逆</span><div><strong>Sora · 发送确认邮件</strong><small>仅在事务提交后执行</small></div><span class="effect-state">等待提交</span></div>
+            <div class="atomix-scene" aria-label="四个 Agent 在同一差旅事务中登记不同类型的工具副作用；Atomix 根据资源进度在提交时统一释放，或在中止时丢弃、补偿和阻止它们">
+              <span class="atomix-brief"><strong>差旅单 trip-42 · 预算 ¥4,800</strong><span>目标 · 预订酒店并发送确认</span></span>
+              <span class="atomix-state" data-atomix-state>等待开启事务</span>
+              <span class="atomix-gate-label" data-atomix-gate>SETTLEMENT GATE · CLOSED</span>
+              <svg class="atomix-paths" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+                <defs><marker id="atomix-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="context-stroke"/></marker></defs>
+                <line class="atomix-gate-line" x1="660" y1="65" x2="660" y2="445"/>
+                <path data-atomix-path="task-draft" marker-end="url(#atomix-arrow)" pathLength="1" d="M245 115 H405"/>
+                <path data-atomix-path="task-hotel" marker-end="url(#atomix-arrow)" pathLength="1" d="M245 215 H405"/>
+                <path data-atomix-path="task-payment" marker-end="url(#atomix-arrow)" pathLength="1" d="M245 315 H405"/>
+                <path data-atomix-path="task-email" marker-end="url(#atomix-arrow)" pathLength="1" d="M245 415 H405"/>
+                <path data-atomix-path="release-draft" marker-end="url(#atomix-arrow)" pathLength="1" d="M575 115 H745"/>
+                <path data-atomix-path="release-hotel" marker-end="url(#atomix-arrow)" pathLength="1" d="M575 215 H745"/>
+                <path data-atomix-path="release-payment" marker-end="url(#atomix-arrow)" pathLength="1" d="M575 315 H745"/>
+                <path data-atomix-path="release-email" marker-end="url(#atomix-arrow)" pathLength="1" d="M575 415 H745"/>
+                <path data-atomix-path="compensate-hotel" marker-end="url(#atomix-arrow)" pathLength="1" d="M745 228 H590"/>
+                <path data-atomix-path="compensate-payment" marker-end="url(#atomix-arrow)" pathLength="1" d="M745 328 H590"/>
+              </svg>
+
+              <span class="atomix-task" data-atomix-task="draft" style="--x:17%;--y:23%;"><strong>登记行程草稿</strong><span>Ada · bufferable</span><i class="atomix-progress" aria-hidden="true"><i data-atomix-progress></i></i></span>
+              <span class="atomix-task" data-atomix-task="hotel" style="--x:17%;--y:43%;"><strong>预留酒店</strong><span>Lin · reversible</span><i class="atomix-progress" aria-hidden="true"><i data-atomix-progress></i></i></span>
+              <span class="atomix-task" data-atomix-task="payment" style="--x:17%;--y:63%;"><strong>创建支付意图</strong><span>Mira · reversible</span><i class="atomix-progress" aria-hidden="true"><i data-atomix-progress></i></i></span>
+              <span class="atomix-task" data-atomix-task="email" style="--x:17%;--y:83%;"><strong>登记确认邮件</strong><span>Sora · irreversible</span><i class="atomix-progress" aria-hidden="true"><i data-atomix-progress></i></i></span>
+
+              <span class="atomix-effect" data-atomix-effect="draft" style="--x:49%;--y:23%;"><strong>事务缓冲区</strong><span data-effect-state>等待登记</span></span>
+              <span class="atomix-effect" data-atomix-effect="hotel" style="--x:49%;--y:43%;"><strong>酒店预留 H-73</strong><span data-effect-state>等待执行</span></span>
+              <span class="atomix-effect" data-atomix-effect="payment" style="--x:49%;--y:63%;"><strong>支付意图 P-42</strong><span data-effect-state>等待执行</span></span>
+              <span class="atomix-effect" data-atomix-effect="email" style="--x:49%;--y:83%;"><strong>邮件发送门</strong><span data-effect-state>等待登记</span></span>
+
+              <span class="atomix-sink" data-atomix-sink="draft" style="--x:83%;--y:23%;"><strong>itinerary.md</strong><span>尚未写入</span></span>
+              <span class="atomix-sink" data-atomix-sink="hotel" style="--x:83%;--y:43%;"><strong>酒店系统</strong><span>尚无预留</span></span>
+              <span class="atomix-sink" data-atomix-sink="payment" style="--x:83%;--y:63%;"><strong>支付系统</strong><span>尚无意图</span></span>
+              <span class="atomix-sink" data-atomix-sink="email" style="--x:83%;--y:83%;"><strong>客户邮箱</strong><span>尚未发送</span></span>
+
+              <div class="atomix-frontiers" aria-label="当前事务需要等待的资源进度">
+                <span class="resource-frontier" data-resource-frontier="hotel"><strong>酒店库存</strong><i></i><span>有更早事务</span></span>
+                <span class="resource-frontier" data-resource-frontier="budget"><strong>差旅预算</strong><i></i><span>有更早事务</span></span>
+              </div>
             </div>
-            <div class="frontier"><span>冲突前序已结算</span><div class="frontier-track"><i class="frontier-fill" data-frontier></i></div><strong data-frontier-label>0 / 2</strong></div>
           </div>
           <div class="stage-controls"><div class="control-group"><button class="button control-button" type="button" data-action="play" aria-pressed="false">播放</button><button class="button control-button" type="button" data-action="step">单步</button><button class="button control-button" type="button" data-action="reset">重置</button><button class="button control-button" type="button" data-action="abort-mode" aria-pressed="false">模拟预算拒绝</button></div></div>
           <p class="sr-only" role="status" aria-live="polite" data-live></p>
