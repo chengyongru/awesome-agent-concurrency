@@ -18,10 +18,10 @@
     .cordon-state[data-state="checking"] { color: var(--yellow); }
     .cordon-state[data-state="abort"] { color: var(--red); }
     .cordon-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
-    .cordon-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
-    .cordon-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.16; }
-    .cordon-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
-    .cordon-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.28; }
+    .cordon-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .cordon-paths path[data-state="pending"] { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.16; }
+    .cordon-paths path[data-state="active"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1; }
+    .cordon-paths path[data-state="done"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.28; }
     .cordon-paths path[data-state="blocked"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
     .cordon-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: var(--w, 8rem); min-block-size: 3.8rem; place-content: center; gap: 0.14rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out; }
     .cordon-node strong { color: currentColor; font-family: var(--body); font-size: 0.7rem; white-space: nowrap; }

@@ -18,10 +18,10 @@
     .sync-state[data-state="wait"] { color: var(--blue); }
     .sync-state[data-state="stale"], .sync-state[data-state="deadlock"] { color: var(--red); }
     .sync-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
-    .sync-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
-    .sync-paths path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.18; }
-    .sync-paths path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
-    .sync-paths path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.28; }
+    .sync-paths path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .sync-paths path[data-state="pending"] { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.18; }
+    .sync-paths path[data-state="active"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1; }
+    .sync-paths path[data-state="done"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.28; }
     .sync-paths path[data-state="wait"] { stroke: var(--blue); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
     .sync-paths path[data-state="stale"], .sync-paths path[data-state="deadlock"] { stroke: var(--red); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 1; }
     .sync-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: var(--w, 8rem); min-block-size: 3.6rem; place-content: center; gap: 0.14rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out, filter 180ms ease-out; }

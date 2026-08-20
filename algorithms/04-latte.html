@@ -17,11 +17,11 @@
     .scene-state[data-state="active"] { color: var(--accent); }
     .scene-state[data-state="review"] { color: var(--blue); }
     .latte-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
-    .latte-paths > path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dasharray 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
+    .latte-paths > path { fill: none; stroke: var(--line-strong); stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke 180ms ease-out, stroke-dashoffset 480ms ease-out, opacity 180ms ease-out; }
     .latte-paths > path.dynamic-edge[data-state="review"] { stroke: var(--blue); stroke-dasharray: 0.035 0.025; stroke-dashoffset: 0; opacity: 0.85; transition-delay: var(--path-delay, 0ms); }
-    .latte-paths > path[data-state="pending"] { stroke-dashoffset: 0; opacity: 0.17; }
-    .latte-paths > path[data-state="active"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
-    .latte-paths > path[data-state="done"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 0.24; }
+    .latte-paths > path[data-state="pending"] { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.17; }
+    .latte-paths > path[data-state="active"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1; }
+    .latte-paths > path[data-state="done"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.24; }
     .latte-paths > path.claim-edge { stroke: var(--accent); stroke-linecap: round; stroke-linejoin: round; }
     .task-node { position: absolute; z-index: 2; inset-inline-start: var(--x); inset-block-start: var(--y); display: grid; inline-size: 8rem; min-block-size: 3.8rem; place-content: center; gap: 0.16rem; padding: 0.45rem; border: 1px solid var(--line-strong); border-radius: 0.4rem; background: var(--ink-raised); color: var(--faint); font-family: var(--mono); text-align: center; transform: translate(-50%, -50%); transition: border-color 180ms ease-out, color 180ms ease-out, background-color 180ms ease-out, transform 220ms ease-out, opacity 220ms ease-out, filter 220ms ease-out; transition-delay: var(--reveal-delay, 0ms); }
     .task-node strong { color: currentColor; font-family: var(--body); font-size: 0.72rem; white-space: nowrap; }

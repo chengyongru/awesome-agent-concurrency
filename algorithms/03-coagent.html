@@ -12,9 +12,9 @@
     .coagent-scene { position: relative; min-block-size: 27.5rem; overflow: visible; font-family: var(--mono); }
     .coagent-paths { position: absolute; z-index: 0; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; pointer-events: none; }
     .coagent-paths > path { fill: none; stroke: var(--line-strong); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; vector-effect: non-scaling-stroke; transition: stroke-dashoffset 480ms ease-out, stroke 180ms ease-out, opacity 180ms ease-out; }
-    .coagent-paths > path[data-state="drawn"] { stroke-dashoffset: 0; opacity: 0.16; }
-    .coagent-paths > path[data-state="active"], .coagent-paths > path[data-state="repair"] { stroke: var(--accent); stroke-dashoffset: 0; opacity: 1; }
-    .coagent-paths > path[data-state="compare"], .coagent-paths > path[data-state="notify"] { stroke: var(--red); stroke-dashoffset: 0; opacity: 1; }
+    .coagent-paths > path[data-state="drawn"] { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.16; }
+    .coagent-paths > path[data-state="active"], .coagent-paths > path[data-state="repair"] { stroke: var(--accent); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1; }
+    .coagent-paths > path[data-state="compare"], .coagent-paths > path[data-state="notify"] { stroke: var(--red); stroke-dasharray: none; stroke-dashoffset: 0; opacity: 1; }
     .edge-label { position: absolute; z-index: 3; padding: 0.18rem 0.35rem; border-radius: 99rem; background: var(--ink-raised); color: var(--accent); font-size: 0.52rem; white-space: nowrap; opacity: 0; transform: translate(-50%, 0.35rem); transition: opacity 180ms ease-out, transform 180ms ease-out, color 180ms ease-out; }
     .edge-label[data-state="active"], .edge-label[data-state="compare"], .edge-label[data-state="notify"], .edge-label[data-state="repair"] { opacity: 1; transform: translate(-50%, 0); }
     .edge-label[data-state="compare"], .edge-label[data-state="notify"] { color: var(--red); }
